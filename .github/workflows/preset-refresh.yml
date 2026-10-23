@@ -31,12 +31,12 @@ concurrency:
 jobs:
   refresh:
     name: Re-check every preset
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Every station in every preset is connected to, one at a time, with an
     # eight-second bound each. A hundred stations is a quarter of an hour.
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
       - name: Connect to every stream
         run: |

@@ -18,7 +18,7 @@ jobs:
         include:
           - os: linux
             arch: amd64
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
           - os: linux
             arch: arm64
             runner: ubuntu-24.04-arm
@@ -30,12 +30,12 @@ jobs:
             runner: macos-latest
           - os: windows
             arch: amd64
-            runner: windows-latest
+            runner: windows-2022
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v5.1.0
         with:
           go-version: '1.24'
 
@@ -49,6 +49,16 @@ jobs:
       - name: Smoke test
         if: runner.os != 'Windows'
         run: bash ./script/smoke-test.sh
+        shell: bash
+
+      - name: The rest of the suite, on the platform people actually run
+        if: runner.os == 'macOS'
+        run: |
+          bash ./script/test-presets.sh
+          bash ./script/test-radiobrowser.sh
+          bash ./script/test-preset-strikes.sh
+          bash ./script/test-preset-icons.sh
+          bash ./script/fuzz-test.sh
         shell: bash
 
       - name: Package
@@ -83,7 +93,7 @@ jobs:
           ls -l "$stage.tar.gz"
 
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.3
         with:
           name: ${{ steps.package.outputs.name }}
           path: ${{ steps.package.outputs.name }}.tar.gz

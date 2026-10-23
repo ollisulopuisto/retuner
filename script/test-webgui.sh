@@ -62,7 +62,7 @@ INI
 }
 
 start_server() {
-  ( cd "$WORK" && exec ./retuner > "$1" 2>&1 ) &
+  ( cd "$WORK" && exec ./retuner -p "$PORT" > "$1" 2>&1 ) &
   PID=$!
   i=0
   while [ "$i" -lt 60 ]; do
