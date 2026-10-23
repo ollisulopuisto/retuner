@@ -66,7 +66,7 @@ MaintenanceServerPort=$MPORT
 INI
   printf '[Test]\nA=http://127.0.0.1:1/a.mp3\n' > "$run/stations.ini"
 
-  ( cd "$run" && HEAPTRC="log=$run/heap.txt" exec ./retuner > server.log 2>&1 ) &
+  ( cd "$run" && HEAPTRC="log=$run/heap.txt" exec ./retuner -p "$PORT" > server.log 2>&1 ) &
   pid=$!
   i=0
   while [ "$i" -lt 60 ]; do

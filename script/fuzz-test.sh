@@ -84,7 +84,7 @@ start_server() {
   fi
 
   cp "$BIN" "$1/retuner"
-  ( cd "$1" && exec ./retuner > server.log 2>&1 ) &
+  ( cd "$1" && exec ./retuner -p "$PORT" > server.log 2>&1 ) &
   SERVER_PID=$!
   STARTED_PIDS="$STARTED_PIDS $SERVER_PID"
   i=0

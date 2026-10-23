@@ -39,13 +39,13 @@ permissions:
 jobs:
   preset:
     name: Generate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Every candidate stream is connected to, one at a time. Sixty of them with
     # a twelve-second bound each is the worst case, and the logo lookup adds a
     # request per station the directory has no favicon for.
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
       - name: Check the country code
         env:
@@ -70,7 +70,7 @@ jobs:
           cat "presets/$CC.ini"
 
       - name: Upload it for review
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.3
         with:
           name: preset-${{ inputs.country }}
           path: presets/*.ini

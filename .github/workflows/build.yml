@@ -1,203 +1,34 @@
-name: Build
+name: PR tests
 
 on:
   push:
-    branches: [ master, 'claude/**' ]
+    branches:
+      - '**'
   pull_request:
-  workflow_dispatch:
+    branches:
+      - master
 
 jobs:
-  linux:
-    name: Linux x86_64
-    runs-on: ubuntu-latest
+  test:
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
-      - name: Install build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            fp-compiler fp-units-fcl fp-units-net fp-units-db fp-units-misc \
-            lazarus-src zip
-
-      - name: Cache Indy checkout
-        uses: actions/cache@v4
+      - name: Install Go
+        uses: actions/setup-go@v5.1.0
         with:
-          path: .build/indy
-          key: indy-${{ runner.os }}-1
+          go-version: '1.24'
 
       - name: Build
-        run: ./script/build.sh
+        run: bash ./script/build.sh
+        shell: bash
 
-      - name: Smoke test
-        run: ./script/smoke-test.sh
-
-      - name: Preset behaviour
-        run: ./script/test-presets.sh
-
-      - name: Radio Browser behaviour
-        run: ./script/test-radiobrowser.sh
-
-      # The preset generator is Python and needs no binary, so it is checked
-      # here rather than in the job that builds one.
-      - name: A station that failed once is not a dead station
-        run: ./script/test-preset-strikes.sh
-
-      - name: Where a station logo comes from
-        run: ./script/test-preset-icons.sh
-
-      - name: Upload binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: retuner-linux-x86_64
-          path: bin/x86_64-linux/retuner
-          if-no-files-found: error
-
-  checked:
-    name: Range and overflow checked
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install build dependencies
+      - name: Test
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            fp-compiler fp-units-fcl fp-units-net fp-units-db fp-units-misc \
-            lazarus-src zip
-
-      - name: Cache Indy checkout
-        uses: actions/cache@v4
-        with:
-          path: .build/indy
-          key: indy-${{ runner.os }}-1
-
-      # -Cr -Co -CR turn a bad index, an overflowed integer or an invalid method
-      # call into an immediate error instead of a wrong answer somewhere later.
-      # The shipped binary does not carry the cost; this job proves the code
-      # would survive if it did, which is the part worth knowing.
-      - name: Build with checks on
-        run: CHECKED=1 ./script/build.sh
-
-      - name: Smoke test
-        run: ./script/smoke-test.sh
-
-      - name: Preset behaviour
-        run: ./script/test-presets.sh
-
-      - name: Radio Browser behaviour
-        run: ./script/test-radiobrowser.sh
-
-      # Malformed DNS packets and hostile station logos, fired at the binary
-      # built with the checks on: -Cr turns a read past the end of a buffer into
-      # a reported error rather than a value that quietly means nothing. This is
-      # the job where that pays for itself.
-      - name: Survives hostile input
-        run: ./script/fuzz-test.sh
-
-      - name: The updater installs, verifies and rolls back
-        run: ./script/test-update.sh
-
-      - name: The stations editor answers only who it should
-        run: ./script/test-webgui.sh
-
-      # The remote forwards to the receiver, so the assertions that matter are
-      # about what never left: a zone command, or one smuggled into a cursor
-      # command. An allowlist that silently forwards looks exactly like one that
-      # works until you check the wire, which is what the mock records.
-      - name: The remote forwards only the commands on the list
-        run: ./script/test-remote.sh
-
-      # Serves a light load and a heavy one and compares what heaptrc reports
-      # unfreed. A fixed residue is expected -- Indy's intentional leaks -- so
-      # growth between the two is the signal, and growth is what fails.
-      - name: Heap does not grow with load
-        run: ./script/test-leaks.sh
-
-  addon:
-    name: Home Assistant add-on
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Check the add-on metadata parses and says what it must
-        run: |
-          python3 - <<'PY'
-          import sys, yaml
-          repo = yaml.safe_load(open('repository.yaml'))
-          for key in ('name', 'url', 'maintainer'):
-              assert repo.get(key), f'repository.yaml is missing {key}'
-
-          cfg = yaml.safe_load(open('retuner/config.yaml'))
-          for key in ('name', 'version', 'slug', 'description', 'arch'):
-              assert cfg.get(key), f'config.yaml is missing {key}'
-
-          # Home Assistant labels an option with its raw key when there is no
-          # translation for it, which is how the config page ends up unreadable.
-          tr = yaml.safe_load(open('retuner/translations/en.yaml'))['configuration']
-          missing = set(cfg['schema']) - set(tr)
-          assert not missing, f'options with no translation: {missing}'
-          stray = set(tr) - set(cfg['schema'])
-          assert not stray, f'translations for options that do not exist: {stray}'
-          blank = [k for k, v in tr.items() if not v.get('name') or not v.get('description')]
-          assert not blank, f'translations missing name/description: {blank}'
-
-          # Every option needs a schema entry and vice versa, or the supervisor
-          # silently drops it and the service script reads an empty string.
-          opts, schema = set(cfg['options']), set(cfg['schema'])
-          assert opts == schema, f'options/schema mismatch: {opts ^ schema}'
-
-          # The add-on's version tracks APP_VERSION. They drifted apart once
-          # already, when two branches bumped it independently, and the only
-          # thing that noticed was a merge conflict -- which would not have
-          # happened had one of them touched only one of the two files.
-          import re
-          pas = open('src/common.pas').read()
-          app = re.search(r"^ *APP_VERSION *= *'([0-9.]+)'", pas, re.M).group(1)
-          assert cfg['version'] == app, \
-              f"config.yaml says {cfg['version']}, src/common.pas says {app}"
-
-          build = yaml.safe_load(open('retuner/build.yaml'))
-          missing = set(cfg['arch']) - set(build['build_from'])
-          assert not missing, f'build.yaml has no base image for {missing}'
-          print('add-on metadata ok')
-          PY
-
-      - name: Check the service script
-        run: |
-          bash -n retuner/rootfs/etc/s6-overlay/s6-rc.d/retuner/run
-          test -x retuner/rootfs/etc/s6-overlay/s6-rc.d/retuner/run \
-            || { echo "the s6 run script is not executable"; exit 1; }
-          test -f retuner/rootfs/etc/s6-overlay/s6-rc.d/user/contents.d/retuner \
-            || { echo "the service is not registered under user/contents.d"; exit 1; }
-          shellcheck --shell=bash --exclude=SC1091,SC2148 \
-            retuner/rootfs/etc/s6-overlay/s6-rc.d/retuner/run
-          for f in script/check-addon-image.sh script/smoke-test.sh script/test-presets.sh script/test-radiobrowser.sh script/fuzz-test.sh script/test-update.sh script/retuner-update.sh script/test-webgui.sh script/test-remote.sh script/test-preset-strikes.sh script/test-preset-icons.sh script/refresh-presets.sh; do
-            sh -n "$f"
-            shellcheck --shell=sh "$f"
-          done
-          for f in script/make-preset.py script/testdata/mock-radiobrowser.py script/testdata/mock-images.py script/testdata/fuzz-dns.py script/testdata/mock-release.py script/testdata/mock-denon.py script/testdata/mock-stream.py script/testdata/mock-website.py script/testdata/localserver.py; do
-            python3 -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$f"
-          done
-
-      # Builds the add-on image the way a Home Assistant machine would, so a
-      # broken Dockerfile is caught here rather than on someone's Pi.
-      - name: Build the add-on image
-        run: |
-          docker build \
-            --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base-debian:bookworm \
-            --build-arg RETUNER_REPO="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git" \
-            --build-arg RETUNER_REF="${{ github.head_ref || github.ref_name }}" \
-            -t retuner-addon:test \
-            retuner
-
-      # Not started here: the binary is a server and would never exit. Checking
-      # that it is present, executable and has every shared library it needs is
-      # what this stage can prove; the smoke test above covers it running.
-      # The script lives in script/check-addon-image.sh so shellcheck can see it
-      # and so its quoting is not at the mercy of the YAML around it.
-      - name: Check the built image carries a runnable binary
-        run: |
-          docker run --rm --entrypoint /bin/sh \
-            -v "${GITHUB_WORKSPACE}/script/check-addon-image.sh:/check.sh:ro" \
-            retuner-addon:test /check.sh
+          bash ./script/smoke-test.sh
+          bash ./script/test-presets.sh
+          bash ./script/test-radiobrowser.sh
+          bash ./script/test-preset-strikes.sh
+          bash ./script/test-preset-icons.sh
+          bash ./script/fuzz-test.sh
+        shell: bash

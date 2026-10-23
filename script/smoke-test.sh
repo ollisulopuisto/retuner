@@ -55,7 +55,7 @@ EOF
 # orphan holding a port is what made a previous suite adopt a stray server and
 # blame the wrong component. Linux hid this: its shells optimise the last
 # command of a subshell into an exec anyway.
-( cd "$WORK" && exec ./retuner > server.log 2>&1 ) &
+( cd "$WORK" && exec ./retuner -p "$PORT" > server.log 2>&1 ) &
 PID=$!
 
 # Wait for the listener rather than sleeping a fixed amount.

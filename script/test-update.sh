@@ -65,7 +65,7 @@ if [ -f "$WORK/refuse" ] \\
    && [ "\$(cksum < "$WORK/install/retuner")" != "\$(cat "$WORK/good.cksum")" ]; then
   exit 0
 fi
-( cd "$WORK/install" && exec ./retuner > "$WORK/install/service.log" 2>&1 ) &
+( cd "$WORK/install" && exec ./retuner -p "$PORT" > "$WORK/install/service.log" 2>&1 ) &
 echo \$! > "$SERVICE_PID_FILE"
 RESTART
 chmod +x "$WORK/restart.sh"
