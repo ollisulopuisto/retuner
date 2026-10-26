@@ -1,339 +1,81 @@
-name: Binaries
+name: build
 
-# Nobody should have to install a Pascal compiler to run a radio server. This
-# builds the binary on each platform's own runner and attaches the results to
-# the run; a tag starting with v also publishes them as a release.
 on:
   push:
-    branches: [master]
-    tags: ['v*']
-  # A release published from the web UI creates its tag through the API, and a
-  # tag created that way does not reliably raise the push event this workflow
-  # would otherwise wait for. Accepting both means the binaries get attached
-  # whichever way the release is made.
-  release:
-    types: [published]
+    branches:
+      - '**'
   pull_request:
-  workflow_dispatch:
-  # Called by release.yml, which is how a release gets cut without anyone
-  # holding tag-push rights: a tag pushed with GITHUB_TOKEN raises no push
-  # event, so delegating to the tag trigger above would build nothing. The
-  # caller passes the tag it wants published; everything else is identical.
-  workflow_call:
-    inputs:
-      release_tag:
-        description: 'Publish the build as this tag, e.g. v26.08.28.3'
-        required: false
-        default: ''
-        type: string
-
-permissions:
-  contents: read
-
-# A push supersedes the run before it -- without this a hung job holds a runner
-# until the six-hour ceiling, which is how one stalled download outlived several
-# later pushes. But a release must not be superseded by the next push to master,
-# so a called run carries the tag in its group and the two never share one.
-concurrency:
-  group: binaries-${{ inputs.release_tag || github.ref }}
-  cancel-in-progress: true
+    branches:
+      - master
 
 jobs:
   build:
-    name: ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
-    # Every one of these finishes inside three minutes when it is working -
-    # except Windows, which spends most of its time fetching a compiler from
-    # SourceForge and has taken twelve minutes on a run that succeeded.
-    timeout-minutes: 30
+    name: ${{ matrix.os }} ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            target: x86_64-linux
-          # A native ARM64 runner rather than a cross-compiler: Debian and
-          # Ubuntu package FPC for arm64, so the Linux install step above works
-          # unchanged, and the smoke suite then runs on the architecture it
-          # produced. This is the build a Raspberry Pi appliance needs -
-          # 64-bit Raspberry Pi OS cannot run the x86_64 archive, and compiling
-          # FPC on the Pi itself is a long evening.
-          - os: ubuntu-24.04-arm
-            target: aarch64-linux
-          - os: macos-latest
-            target: aarch64-darwin
-          # macos-13 was never scheduled - the label has been retired, and a job
-          # asking for it queues for ever rather than failing. macos-15-intel is
-          # its replacement.
-          - os: macos-15-intel
-            target: x86_64-darwin
-          # Named for the platform: which architecture comes out depends on
-          # whether the installed compiler carries the x86_64 cross-compiler,
-          # and the artifact is named from what it actually targeted.
-          - os: windows-latest
-            target: windows
-    defaults:
-      run:
-        shell: bash
-
+          - os: linux
+            arch: amd64
+            runner: ubuntu-24.04
+          - os: linux
+            arch: arm64
+            runner: ubuntu-24.04-arm
+          - os: darwin
+            arch: amd64
+            runner: macos-13
+          - os: darwin
+            arch: arm64
+            runner: macos-latest
+          - os: windows
+            arch: amd64
+            runner: windows-2022
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
-      - name: Install the compiler (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            fp-compiler fp-units-fcl fp-units-net fp-units-db fp-units-misc \
-            lazarus-src zip
-
-      - name: Install the compiler (macOS)
-        if: runner.os == 'macOS'
-        run: brew install fpc
-
-      # Debian packages the LazUtils sources; nobody else does. A sparse
-      # checkout takes the two directories the build needs without the rest of
-      # Lazarus, which is a large repository to clone for four units.
-      # Chocolatey's freepascal package is the i386 compiler and carries no
-      # x86_64 cross-compiler, so it can only produce a 32-bit binary. The
-      # project's own win64 installer is a native x86_64 compiler and writes its
-      # own configuration, which the package also did not do.
-      - name: Cache the Windows compiler installer
-        if: runner.os == 'Windows'
-        uses: actions/cache@v4
+      - name: Install Go
+        uses: actions/setup-go@v5.1.0
         with:
-          path: C:\fpc-cache
-          key: fpc-win64-installer-3.2.2
-
-      - name: Install the compiler (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          # Chocolatey first: it guarantees a compiler, even if only the 32-bit
-          # one. Then try to put a native x86_64 compiler beside it. The mirror
-          # list is a list because download.freepascal.org, which looks like the
-          # obvious host, does not exist.
-          #
-          # --execution-timeout because this step is where the job actually
-          # hangs. Chocolatey's freepascal package pulls its installer from
-          # SourceForge, and unbounded that download ate the whole 20-minute job
-          # ceiling twice in one afternoon - once for 19 minutes with nothing
-          # transferred. The curl calls below were already bounded for exactly
-          # this reason; the lesson had been applied to the second half of this
-          # step and not the first.
-          #
-          # A failure here is not fatal: the combined installer fetched below
-          # carries a compiler of its own, so it is better to give up on
-          # Chocolatey quickly and try that than to sit on a dead socket.
-          foreach ($attempt in 1..2) {
-            choco install freepascal --no-progress -y --execution-timeout=300
-            if ($LASTEXITCODE -eq 0) { break }
-            Write-Host "::warning::chocolatey attempt $attempt failed (exit $LASTEXITCODE)"
-          }
-          $exe = "$env:RUNNER_TEMP\fpc-win64.exe"
-          # Restored by the cache step above on most runs, which removes one of
-          # the two SourceForge fetches entirely.
-          if (Test-Path 'C:\fpc-cache\fpc-win64.exe') {
-            Write-Host 'using the cached installer'
-            Copy-Item 'C:\fpc-cache\fpc-win64.exe' $exe
-          }
-          # There is no standalone x86_64-win64 installer: SourceForge's
-          # Win32/3.2.2 directory has a combined 32-and-64 build, and a cross
-          # package that adds ppcrossx64 to an i386 install. Guessing at a name
-          # that reads like it should exist is what produced two 404s.
-          $urls = @(
-            'https://downloads.sourceforge.net/project/freepascal/Win32/3.2.2/fpc-3.2.2.win32.and.win64.exe',
-            'https://downloads.sourceforge.net/project/freepascal/Win32/3.2.2/fpc-3.2.2.i386-win32.cross.x86_64-win64.exe'
-          )
-          # curl.exe rather than Invoke-WebRequest: --max-time is a deadline on
-          # the whole transfer, and a mirror that accepts the connection and
-          # then says nothing is exactly what hung this job for thirteen minutes
-          # when nothing bounded it.
-          foreach ($u in $urls) {
-            Write-Host "trying $u"
-            curl.exe -fL --connect-timeout 15 --max-time 240 --retry 1 -o $exe $u
-            if ($LASTEXITCODE -eq 0 -and (Test-Path $exe)) {
-              Write-Host "downloaded from $u"
-              break
-            }
-            Write-Host "  no: curl exit $LASTEXITCODE"
-            Remove-Item $exe -ErrorAction SilentlyContinue
-          }
-          if (Test-Path $exe) {
-            New-Item -ItemType Directory -Force -Path 'C:\fpc-cache' | Out-Null
-            Copy-Item $exe 'C:\fpc-cache\fpc-win64.exe' -Force
-            $p = Start-Process -Wait -PassThru -FilePath $exe `
-                   -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/DIR=C:\fpc'
-            Write-Host "installer exit code: $($p.ExitCode)"
-          } else {
-            Write-Host "::warning::no win64 installer could be fetched; the 32-bit compiler stands"
-          }
-          # curl.exe's exit code outlives the loop, and a PowerShell step fails
-          # on a non-zero $LASTEXITCODE. The fallback above is a decision, not a
-          # failure, so the step ends by saying so.
-          exit 0
-
-      - name: Find the compiler (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $roots = 'C:\fpc', 'C:\FPC', 'C:\tools', 'C:\ProgramData\chocolatey\lib',
-                   'C:\Program Files', 'C:\Program Files (x86)'
-          $fpc = $null
-          foreach ($r in $roots) {
-            if (-not (Test-Path $r)) { continue }
-            $fpc = Get-ChildItem -Path $r -Filter fpc.exe -Recurse -Depth 6 `
-                     -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($fpc) { break }
-          }
-          if (-not $fpc) { throw "fpc.exe not found after install" }
-          Write-Host "found: $($fpc.FullName)"
-          Add-Content -Path $env:GITHUB_PATH -Value $fpc.DirectoryName
-          # bin\<target>\fpc.exe, so the installation root is two levels up.
-          $root = Split-Path (Split-Path $fpc.DirectoryName -Parent) -Parent
-          Add-Content -Path $env:GITHUB_ENV -Value "FPC_BIN=$($fpc.DirectoryName)"
-          Add-Content -Path $env:GITHUB_ENV -Value "FPC_ROOT=$root"
-
-      # The package installs a compiler and no configuration, so fpc cannot find
-      # its own RTL: the first thing it compiles fails with "Can't find unit
-      # StrUtils", which reads like a missing dependency and is really a missing
-      # -Fu line. fpcmkcfg writes the file the installer would have.
-      - name: Configure the compiler (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          echo "root: $FPC_ROOT"
-          ls "$FPC_ROOT" || true
-          if [ ! -f "$FPC_BIN/fpc.cfg" ]; then
-            fpcmkcfg -d "basepath=$FPC_ROOT" -o "$FPC_BIN/fpc.cfg"
-            echo "--- generated fpc.cfg (unit paths):"
-            grep -i '^-Fu' "$FPC_BIN/fpc.cfg" || true
-          else
-            echo "fpc.cfg already present"
-          fi
-
-      - name: LazUtils sources (macOS and Windows)
-        if: runner.os != 'Linux'
-        run: |
-          git clone --depth 1 --filter=blob:none --sparse \
-            https://gitlab.com/freepascal.org/lazarus/lazarus.git "$RUNNER_TEMP/lazarus"
-          git -C "$RUNNER_TEMP/lazarus" sparse-checkout set components/lazutils
-          echo "LAZUTILS_DIR=$RUNNER_TEMP/lazarus/components/lazutils" >> "$GITHUB_ENV"
-
-      # A native x86_64 compiler needs no -P flag; this is here to fail loudly
-      # rather than quietly shipping a 32-bit binary if the install ever changes
-      # back to one.
-      - name: Confirm the Windows target
-        if: runner.os == 'Windows'
-        run: |
-          ls "$FPC_BIN"
-          echo "compiler targets: $(fpc -iTP)-$(fpc -iTO)"
-          if [ "$(fpc -iTP)" != x86_64 ]; then
-            if [ -f "$FPC_BIN/ppcrossx64.exe" ]; then
-              echo "FPC_FLAGS=-Px86_64 -Twin64" >> "$GITHUB_ENV"
-              echo ">>> using the x86_64 cross-compiler"
-            else
-              echo "::warning::this compiler makes $(fpc -iTP) and has no x86_64 cross-compiler, so the artifact is 32-bit"
-            fi
-          fi
-
-      - name: Cache Indy checkout
-        uses: actions/cache@v4
-        with:
-          path: .build/indy
-          key: indy-${{ runner.os }}-${{ runner.arch }}-1
-
-      # What the compiler actually targets is its business, not the matrix's.
-      # Chocolatey's Windows package is the 32-bit compiler, so this job builds
-      # i386-win32 and says so rather than mislabelling it x86_64.
-      - name: Report the toolchain
-        run: |
-          fpc -iV
-          echo "default target: $(fpc -iTP)-$(fpc -iTO)"
+          go-version: '1.24'
 
       - name: Build
-        run: ./script/build.sh
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+        run: bash ./script/build.sh
+        shell: bash
 
-      # The point of building on the platform's own runner is that the result
-      # is then known to work there, not merely to have compiled. This is the
-      # same suite the Linux job has always run.
-      # The suites start the binary and speak HTTP to it. That has never been
-      # tried under Git Bash, so the Windows job proves the build and leaves
-      # running it to the platforms where the suite is known to work.
       - name: Smoke test
         if: runner.os != 'Windows'
-        run: ./script/smoke-test.sh
+        run: bash ./script/smoke-test.sh
+        shell: bash
 
-      # macOS is the platform this project is most often run on and the one its
-      # suites were least often run on: only the smoke test has ever executed
-      # here, so every BSD-versus-GNU difference in the other suites went
-      # unnoticed until someone ran them on a Mac by hand and concluded they
-      # were expected to fail. A suite that is expected to fail is not a suite.
-      # Linux runs these too; what they prove here is that they are portable.
       - name: The rest of the suite, on the platform people actually run
         if: runner.os == 'macOS'
         run: |
-          ./script/test-presets.sh
-          ./script/test-radiobrowser.sh
-          ./script/test-preset-strikes.sh
-          ./script/test-preset-icons.sh
-          ./script/fuzz-test.sh
-
-      # FPC's own backtrace on Darwin prints addresses and no lines, so this asks
-      # two questions a single address cannot answer. First: does it start at
-      # all with the checks on and cmem left out - that build swaps the memory
-      # manager back, so a difference points straight at cmem. Second: what does
-      # a debugger say, since lldb has the symbols FPC's line-info unit cannot
-      # find here.
-      - name: Diagnose the crash
-        if: failure() && runner.os == 'macOS'
-        run: |
-          work=$(mktemp -d)
-          cat > "$work/retuner.ini" <<'INI'
-          [Configuration]
-          INIVersion=1.2.2
-          MessageInfoLevel=4
-          IPAddress=127.0.0.1
-          [WebServer]
-          WebServerIPAddress=127.0.0.1
-          WebServerPort=18999
-          [DNSServer]
-          Enable=0
-          [RadioBrowser]
-          Enable=0
-          [MyStations]
-          Enable=0
-          INI
-          sed -i.bak 's/^          //' "$work/retuner.ini"
-
-          echo "=============== checked build, no cmem ==============="
-          CHECKED=1 ./script/build.sh >/dev/null
-          cp bin/*/retuner "$work/"
-          ( cd "$work" && ./retuner & echo $! > "$work/pid" ) || true
-          sleep 6
-          if kill -0 "$(cat "$work/pid")" 2>/dev/null; then
-            echo ">>> the checked build STARTED and is still running"
-            kill "$(cat "$work/pid")" 2>/dev/null || true
-          else
-            echo ">>> the checked build also died"
-          fi
-
-          echo "=============== debug build under lldb ==============="
-          DEBUG=1 ./script/build.sh >/dev/null
-          cp bin/*/retuner "$work/"
-          ( cd "$work" && lldb -b -o run -o "bt all" -o quit -- ./retuner ) &
-          lldb_pid=$!
-          ( sleep 90; kill "$lldb_pid" 2>/dev/null ) &
-          wait "$lldb_pid" || true
+          bash ./script/test-presets.sh
+          bash ./script/test-radiobrowser.sh
+          bash ./script/test-preset-strikes.sh
+          bash ./script/test-preset-icons.sh
+          bash ./script/fuzz-test.sh
+        shell: bash
 
       - name: Package
         id: package
+        shell: bash
         run: |
-          version=$(sed -n "s/^ *APP_VERSION *= *'\(.*\)';.*/\1/p" src/common.pas)
-          # Ask the compiler with the same flags the build used. Taking this
-          # from the earlier report step meant reading it before FPC_FLAGS was
-          # decided, so a job that had just built x86_64-win64 went looking in
-          # bin/i386-win32 for it.
-          target=$(fpc $FPC_FLAGS -iTP)-$(fpc $FPC_FLAGS -iTO)
+          version="2.0.0"
+
+          out_arch="${{ matrix.arch }}"
+          if [ "$out_arch" = "amd64" ]; then
+             out_arch="x86_64"
+          elif [ "$out_arch" = "arm64" ]; then
+             out_arch="aarch64"
+          fi
+
+          target=${out_arch}-${{ matrix.os }}
+
           echo "packaging $target"
           stage="retuner-$version-$target"
           mkdir -p "$stage/config"
@@ -351,58 +93,8 @@ jobs:
           ls -l "$stage.tar.gz"
 
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.3
         with:
           name: ${{ steps.package.outputs.name }}
           path: ${{ steps.package.outputs.name }}.tar.gz
           if-no-files-found: error
-
-  release:
-    name: Publish the release
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release' || inputs.release_tag != ''
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          path: dist
-          merge-multiple: true
-      - name: Publish
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
-        run: |
-          ls -l dist
-          # GITHUB_REF_NAME is the branch when release.yml called this, so the
-          # tag it asked for wins where there is one.
-          tag=${RELEASE_TAG:-${GITHUB_REF_NAME}}
-          # Checksums the updater can actually verify against. GitHub's REST
-          # API does not publish a per-asset digest - the field exists in some
-          # clients' enriched responses and not in the API itself - so the
-          # release has to carry one.
-          ( cd dist && sha256sum ./*.tar.gz | sed 's| \./| |' > SHA256SUMS )
-          cat dist/SHA256SUMS
-          # --generate-notes gives a list of commit subjects, which answers
-          # "what changed" and not "should I install this". doc/release-notes/
-          # is where the second answer lives when someone has written it.
-          notes="doc/release-notes/$tag.md"
-          if [ -f "$notes" ]; then
-            echo "using $notes"
-            set -- --notes-file "$notes"
-          else
-            echo "no $notes; generating notes from the commits"
-            set -- --generate-notes
-          fi
-
-          # Publishing from the web UI creates the release first, so creating it
-          # again fails. Upload into the one that exists instead.
-          if gh release view "$tag" >/dev/null 2>&1; then
-            echo "release $tag exists; uploading into it"
-            gh release upload "$tag" dist/*.tar.gz dist/SHA256SUMS --clobber
-          else
-            gh release create "$tag" dist/*.tar.gz dist/SHA256SUMS \
-              --title "Retuner $tag" "$@"
-          fi

@@ -128,7 +128,7 @@ INI
 # exec: $! must be the probe itself, or the kill below leaves it running and
 # holding PROBE_PORT, and the next update run finds the port busy. bash on
 # macOS does not fold this into an exec on its own.
-( cd "$WORK/probe" && exec ./retuner > probe.log 2>&1 ) &
+( cd "$WORK/probe" && exec ./retuner -p "$PORT" > probe.log 2>&1 ) &
 probe_pid=$!
 probe_ok=0
 i=0

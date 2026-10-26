@@ -24,11 +24,11 @@ permissions:
 jobs:
   version:
     name: What is being released
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       tag: ${{ steps.read.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
       - name: Read the version, and check the two places agree
         id: read
