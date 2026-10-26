@@ -1,0 +1,7 @@
+*
+!cfg
+!src
+!res
+!script/build.sh
+!script/zip-sql.sh
+!mikrotik/entrypoint.sh

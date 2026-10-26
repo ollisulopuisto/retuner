@@ -397,6 +397,10 @@ Simply execute `retuner.exe`.
 ### Docker container
 If you are not familiar with building Docker containers you can read [this](doc/DOCKER.md).
 
+### MikroTik RouterOS container
+Retuner can run as a container directly on a MikroTik router with container support (e.g. RB5009), so you don't need a separate Retuner machine. The router's static DNS entries point `*.vtuner.com` to the container.
+A `Dockerfile` that cross-compiles Retuner for ARM64 without emulation, and a build script, are in the [mikrotik](mikrotik) directory. Step by step installation is described in [doc/MIKROTIK.md](doc/MIKROTIK.md).
+
 ### Podcasts
 Set `Enable=1` in the `[Podcasts]` section of `retuner.ini` and list feeds in `podcasts.ini` (same shape as `stations.ini`: `Name=feed URL`, with an optional `|artwork URL`). Each feed becomes a folder and each episode a station, so the AVR browses and plays them the way it does radio — nothing in the firmware has to understand podcasts. Episode enclosures are very often HTTPS-only, which these AVRs cannot fetch at all, so `RelayHTTPS=1` is usually wanted alongside it.
 
