@@ -1,0 +1,16 @@
+{
+  "fi.ini": {
+    "[Chiptune] Keygen FM": {
+      "strikes": 1,
+      "url": "https://keygen-fm.kodatek.app/listen/keygen-fm/radio.mp3"
+    },
+    "[Pop] POPfm": {
+      "strikes": 1,
+      "url": "https://stream.madmenmedia.se/popfm"
+    },
+    "[Radio] Tick Tock Radio - 1950": {
+      "strikes": 1,
+      "url": "https://streaming.ticktock.radio/tt/1950/icecast.audio"
+    }
+  }
+}
