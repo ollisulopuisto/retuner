@@ -95,6 +95,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if "/releases/download/" in path:
             name = path.rsplit("/", 1)[-1]
             full = os.path.join(ASSET_DIR, os.path.basename(name))
+            # The asset name comes from the request path, so confine the
+            # resolved path to ASSET_DIR: no traversal may read a file
+            # anywhere else. os.path.basename() already strips path parts,
+            # but this check makes the confinement explicit and survives a
+            # future change that drops it.
+            root = os.path.realpath(ASSET_DIR)
+            resolved = os.path.realpath(full)
+            if resolved != root and not resolved.startswith(root + os.sep):
+                self._send(404, "no such asset", "text/plain")
+                return
             if not os.path.isfile(full):
                 self._send(404, "no such asset", "text/plain")
                 return
