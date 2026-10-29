@@ -42,6 +42,38 @@ def checksums():
     return "\n".join(lines) + "\n"
 
 
+# ASSET_DIR luetaan lazily ja uudelleen jokaisella download-pyynnöllä (ei
+# välimuistissa), jotta testien myöhään luomat assetit näkyvät ja vanha
+# sisältö ei vuoda testistä toiseen. Lukeminen itsessään on turvallista:
+# ASSET_DIR tulee komentoriviltä, ei koskaan HTTP-pyynnöstä, ja tiedostot
+# avataan os.listdirin palauttamilla nimillä - ei koskaan pyynnöstä
+# johdetulla nimellä. Sen jälkeen assetti palvellaan tästä sanakirjasta, joten
+# pyyntöpolusta johdettu data ei koskaan muodostu tiedostopoluksi. Tämä
+# katkaisee CodeQL:n py/path-injection -datan kulkun pyynnöstä levylle:
+# open()-kutsussa ei ole enää pyyntödataa lainkaan.
+def assets():
+    """Palauta {nimi: tavut} -sanakirja ASSET_DIRin .tar.gz-tiedostoista.
+
+    Avainten nimien on oltavia todellisia, suoraan ASSET_DIRissa olevia
+    tiedostoja; symlinkit ohitetaan, ettei koskaan seurata polkua joka voi
+    johtaa ASSET_DIRin ulkopuolelle.
+    """
+    result = {}
+    try:
+        names = os.listdir(ASSET_DIR)
+    except OSError:
+        return result
+    for name in sorted(names):
+        if not name.endswith(".tar.gz"):
+            continue
+        full = os.path.join(ASSET_DIR, name)
+        if os.path.islink(full) or not os.path.isfile(full):
+            continue
+        with open(full, "rb") as f:
+            result[name] = f.read()
+    return result
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -94,27 +126,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
         if "/releases/download/" in path:
             name = path.rsplit("/", 1)[-1]
-            full = os.path.join(ASSET_DIR, os.path.basename(name))
-            # The asset name comes from the request path, so confine the
-            # resolved path to ASSET_DIR: no traversal may read a file
-            # anywhere else. os.path.basename() already strips path parts,
-            # but this check makes the confinement explicit and survives a
-            # future change that drops it.
-            root = os.path.realpath(ASSET_DIR)
-            resolved = os.path.realpath(full)
-            if resolved != root and not resolved.startswith(root + os.sep):
+            # Assetti haetaan yllä olevasta sanakirjasta: pyyntöpolusta
+            # johdettu nimi käy vain avaimena, eikä se koskaan päädy
+            # tiedostopoluksi. Kaikki polunmuokkausyritykset (.., symlinkit,
+            # koodatut merkit) jäävät sanakirjan ulkopuolelle ja palauttavat
+            # 404:n.
+            body = assets().get(name)
+            if body is None:
                 self._send(404, "no such asset", "text/plain")
                 return
-            # Pyyntöpolusta johtuva nimi on nyt normalisoitu (realpath) ja
-            # varmistettu ASSET_DIRin sisäiseksi, joten tiedosto avataan
-            # normalisoidusta polusta - ei raakasta pyynnöstä johdetusta
-            # full-polusta. Tämä katkaisee CodeQL:n py/path-injection -datan
-            # kulkun pyynnöstä tiedostopääsyyn.
-            if not os.path.isfile(resolved):
-                self._send(404, "no such asset", "text/plain")
-                return
-            with open(resolved, "rb") as f:
-                body = f.read()
             self.send_response(200)
             self.send_header("Content-Type", "application/gzip")
             self.send_header("Content-Length", str(len(body)))
