@@ -336,6 +336,9 @@ func deleteSection(lines []string, marker string) []string {
 // an earlier version of its ini file (DBRBCheckAVRView).
 func (b *DB) ensureView(mac string, a *config.AVR) (string, error) {
 	name := viewName(mac, a)
+	if !isSafeSQLIdent(name) {
+		return "", fmt.Errorf("invalid view name")
+	}
 	if b.views[name] {
 		return name, nil
 	}
