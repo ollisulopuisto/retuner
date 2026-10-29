@@ -33,7 +33,56 @@ func (c *Client) filePath(prefix, mac string, a *config.AVR, rest string) string
 	return filepath.Join(c.CacheDir, prefix+"-"+mac+"-"+rest+"-"+strconv.FormatUint(uint64(a.FileCRC), 10)+".cache")
 }
 
+// The startup index of Pascal's LoadRBCacheFilesInfo: a cache file is only
+// read when it was listed when the receiver was first seen (fresh files
+// matching its MAC and ini checksum; expired ones are deleted then) or was
+// written by this process. A file dropped in later is ignored, and one that
+// fails to load leaves the index.
+// IndexFiles indexes the cache files of one receiver now (done at startup for the default one).
+func (c *Client) IndexFiles(mac string, a *config.AVR) { c.indexFor(mac, a) }
+
+func (c *Client) indexFor(mac string, a *config.AVR) {
+	if mac == "" {
+		mac = "avr"
+	}
+	c.idxMu.Lock()
+	defer c.idxMu.Unlock()
+	if c.idxMacs[mac] {
+		return
+	}
+	if c.idxMacs == nil {
+		c.idxMacs, c.idx = map[string]bool{}, map[string]bool{}
+	}
+	c.idxMacs[mac] = true
+	files, _ := filepath.Glob(filepath.Join(c.CacheDir, "RB*-"+mac+"-*-"+strconv.FormatUint(uint64(a.FileCRC), 10)+".cache"))
+	for _, p := range files {
+		if st, err := os.Stat(p); err == nil && (c.TTL <= 0 || time.Since(st.ModTime()) <= c.TTL) {
+			c.idx[p] = true
+		} else {
+			_ = os.Remove(p)
+		}
+	}
+}
+
+func (c *Client) indexed(p string) bool {
+	c.idxMu.Lock()
+	defer c.idxMu.Unlock()
+	return c.idx[p]
+}
+
+func (c *Client) setIndexed(p string, on bool) {
+	c.idxMu.Lock()
+	defer c.idxMu.Unlock()
+	if c.idx == nil {
+		c.idxMacs, c.idx = map[string]bool{}, map[string]bool{}
+	}
+	c.idx[p] = on
+}
+
 func (c *Client) fresh(p string) ([]byte, bool) {
+	if !c.indexed(p) {
+		return nil, false
+	}
 	st, err := os.Stat(p)
 	if err != nil {
 		return nil, false
@@ -153,6 +202,9 @@ func (c *Client) saveFile(p string, b []byte, ok bool) {
 	}
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err == nil {
 		err = os.WriteFile(p, b, 0o644)
+		if err == nil {
+			c.setIndexed(p, true)
+		}
 		if err != nil {
 			log.Printf("Radio-browser.info: catFile cache save error (%v)", err)
 		}
@@ -160,23 +212,27 @@ func (c *Client) saveFile(p string, b []byte, ok bool) {
 }
 
 func (c *Client) fileStations(mac string, a *config.AVR, k Kind, name string) (string, []Station, bool) {
+	c.indexFor(mac, a)
 	p := c.filePath("RBS", mac, a, strconv.Itoa(int(k))+"-"+hash(name))
 	if b, ok := c.fresh(p); ok {
 		if s, ok := decodeStations(b); ok {
 			return p, s, true
 		}
 		log.Printf("Radio-browser.info: catFile cache empty or unreadable %s", filepath.Base(p))
+		c.setIndexed(p, false)
 	}
 	return p, nil, false
 }
 
 func (c *Client) fileCategories(mac string, a *config.AVR, k Kind) (string, []Category, bool) {
+	c.indexFor(mac, a)
 	p := c.filePath("RBC", mac, a, strconv.Itoa(int(k)))
 	if b, ok := c.fresh(p); ok {
 		if s, ok := decodeCategories(b); ok {
 			return p, s, true
 		}
 		log.Printf("Radio-browser.info: catFile cache empty or unreadable %s", filepath.Base(p))
+		c.setIndexed(p, false)
 	}
 	return p, nil, false
 }
@@ -188,6 +244,7 @@ func (c *Client) fromListFiles(uuid, mac string, a *config.AVR) (Station, bool) 
 	if mac == "" {
 		mac = "avr"
 	}
+	c.indexFor(mac, a)
 	files, _ := filepath.Glob(filepath.Join(c.CacheDir, "RBS-"+mac+"-*-"+strconv.FormatUint(uint64(a.FileCRC), 10)+".cache"))
 	for _, p := range files {
 		b, ok := c.fresh(p)

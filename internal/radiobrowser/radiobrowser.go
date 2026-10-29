@@ -65,6 +65,10 @@ type Client struct {
 	DB         *DB    // set for the SQLite cache types
 	CacheDir   string // catFile: where the .cache files live
 
+	idxMu   sync.Mutex
+	idxMacs map[string]bool // receivers whose cache files were indexed
+	idx     map[string]bool // catFile paths in the index
+
 	mu    sync.Mutex
 	cache map[string]cached
 	uuids []string

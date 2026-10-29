@@ -67,6 +67,9 @@ func main() {
 		rb = radiobrowser.New(cfg.Str("RadioBrowser", "RBAPIURL"), "Retuner/"+config.AppVersion,
 			cfg.Int("RadioBrowser", "RBPopularAndSearchStationsLimit", 100), cfg.Int("RadioBrowser", "RBMinStationsPerCategory", 3), ct, cfg.Int("RadioBrowser", "RBCacheTTL", 0))
 		rb.CacheDir = cfg.CacheDir()
+		if ct == "catFile" {
+			rb.IndexFiles("", avr) // Pascal indexes the default receiver at startup
+		}
 		if ct == "catDB" || ct == "catMemDB" || ct == "catPermMemDB" {
 			// As in Pascal the database is prepared before serving. A failure
 			// disables Radio Browser; it never falls back to per-request live calls.
