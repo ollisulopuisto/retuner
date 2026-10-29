@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -297,13 +296,14 @@ func (b *DB) execWithJSON(d *sql.DB, steps, path string) error {
 		}
 	}
 	return nil
-func viewName(a *config.AVR) string {
-	return "avr_" + strconv.FormatUint(uint64(a.FileCRC), 10)
-var safeSQLIdent = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
-
-func isSafeSQLIdent(s string) bool {
-	return safeSQLIdent.MatchString(s)
 }
+
+// safeSQLIdent guards the few values that are spliced into SQL text (the view
+// name, the ORDER BY column) because SQLite cannot bind identifiers. Values
+// that are data (category, search text, station id) are bound as parameters.
+var safeSQLIdent = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+func isSafeSQLIdent(s string) bool { return safeSQLIdent.MatchString(s) }
 
 func viewName(mac string, a *config.AVR) string {
 	return "avr" + mac + "_" + strconv.FormatUint(uint64(a.FileCRC), 10)
@@ -327,7 +327,7 @@ func deleteSection(lines []string, marker string) []string {
 		}
 		if end < len(lines) {
 			end++
-	name := viewName(a)
+		}
 		lines = append(lines[:start], lines[end:]...)
 	}
 }
@@ -386,12 +386,6 @@ func (b *DB) ensureView(mac string, a *config.AVR) (string, error) {
 	}
 	if _, err := b.db.Exec(text()); err != nil {
 		return "", fmt.Errorf("create view: %w", err)
-var safeSQLIdent = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
-
-func isSafeSQLIdent(s string) bool {
-	return safeSQLIdent.MatchString(s)
-}
-
 	}
 	b.views[name] = true
 	return name, nil
@@ -401,7 +395,7 @@ const filterStripChars = "!\"'():@&=+$,/?%#[]-.~\n\r\t"
 
 func (b *DB) Categories(k Kind, a *config.AVR, mac string, start, howMany int) ([]Category, int) {
 	v, err := b.ensureView(mac, a)
-	if err != nil {
+	if err != nil || !isSafeSQLIdent(v) {
 		log.Printf("Radio-browser database: %v", err)
 		return nil, 0
 	}
@@ -426,64 +420,41 @@ func (b *DB) Categories(k Kind, a *config.AVR, mac string, start, howMany int) (
 	}
 	return out, total
 }
-	if !isSafeSQLIdent(v) {
-		log.Printf("Radio-browser database query error (invalid view identifier)")
-		return nil, 0
-	}
 
 func (b *DB) Stations(k Kind, name string, a *config.AVR, mac string, start, howMany int) ([]Station, int) {
 	v, err := b.ensureView(mac, a)
-	if err != nil {
+	if err != nil || !isSafeSQLIdent(v) {
 		log.Printf("Radio-browser database: %v", err)
 		return nil, 0
 	}
 	q := script("RBDB_SQL_SELECT_STATIONS")
-	args := make([]any, 0, 3)
 	q = strings.ReplaceAll(q, "@@@AVR", v)
 	dir := "ASC"
-		cat, order = dbCategoryField[k]+" = ?", a.Order
-		args = append(args, clean)
+	if a.Reverse {
 		dir = "DESC"
 	}
 	clean := config.StripChars(httpDecodeName(name), filterStripChars)
+	var cat, order string
+	var args []any
+	switch k {
+	case Genre, Country, Language:
+		cat, order = dbCategoryField[k]+" = ?", a.Order
+		args = append(args, clean)
+	case Popular:
+		cat, order, dir = "tc=1", "votes", "DESC"
+	case Search:
 		cat, order = "name LIKE ?", a.Order
 		args = append(args, "%"+clean+"%")
-	switch k {
-
-	allowedOrder := map[string]bool{
-		"name":      true,
-		"votes":     true,
-		"bitrate":   true,
-		"codec":     true,
-		"country":   true,
-		"language":  true,
-		"tags":      true,
-		"homepage":  true,
-		"url":       true,
-		"stationid": true,
 	}
-	if !allowedOrder[order] {
+	if !isSafeSQLIdent(order) {
 		order = "name"
-	}
-	if dir != "ASC" && dir != "DESC" {
-		dir = "ASC"
-	}
-
-	case Genre, Country, Language:
-		cat, order = dbCategoryField[k]+"= '"+clean+"'", a.Order
-	case Popular:
-	q = strings.ReplaceAll(q, "@@@Start", "?")
-	q = strings.ReplaceAll(q, "@@@Offset", "?")
-	args = append(args, start, howMany)
-
-	rows, err := b.db.Query(q, args...)
 	}
 	q = strings.ReplaceAll(q, "@@@Category", cat)
 	q = strings.ReplaceAll(q, "@@@Order", order)
 	q = strings.ReplaceAll(q, "@@@DirOrder", dir)
 	q = strings.ReplaceAll(q, "@@@Start", strconv.Itoa(start))
 	q = strings.ReplaceAll(q, "@@@Offset", strconv.Itoa(howMany))
-	rows, err := b.db.Query(q)
+	rows, err := b.db.Query(q, args...)
 	if err != nil {
 		log.Printf("Radio-browser database query error (%v)", err)
 		return nil, 0
@@ -505,10 +476,7 @@ func (b *DB) Stations(k Kind, name string, a *config.AVR, mac string, start, how
 
 func (b *DB) ByID(id12 string, a *config.AVR, mac string) (Station, bool) {
 	v, err := b.ensureView(mac, a)
-	if err != nil {
-		return Station{}, false
-	}
-	if !isSafeSQLIdent(v) {
+	if err != nil || !isSafeSQLIdent(v) {
 		return Station{}, false
 	}
 	id := config.StripChars(id12, filterStripChars)
