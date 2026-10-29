@@ -1,15 +1,29 @@
 name: PR tests
 
+# Pushes are tested on master only. Every PR is tested on its merge result
+# (pull_request), which is the check that matters before a merge; a branch with
+# no PR gets nothing until someone asks: run this workflow by hand from the
+# Actions tab. The manual run only tests. It builds nothing for release and
+# publishes nothing.
 on:
   push:
     branches:
-      - '**'
+      - master
   pull_request:
     branches:
       - master
+  workflow_dispatch:
+
+# A newer push to the same ref supersedes the run before it.
+concurrency:
+  group: pr-tests-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
+    # The suites take about two minutes. The default limit is six hours, which
+    # is what a hung server used to burn.
+    timeout-minutes: 20
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4.2.2

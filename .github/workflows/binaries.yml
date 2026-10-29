@@ -3,10 +3,13 @@ name: build
 on:
   push:
     branches:
-      - '**'
+      - master
   pull_request:
     branches:
       - master
+  # A check-only run of the whole matrix, from the Actions tab, for a branch
+  # with no PR. It has no release_tag input, so the publish job never runs.
+  workflow_dispatch:
   # Called by release.yml, which passes the tag to publish (e.g. v26.08.28.4).
   # Without a tag this is the ordinary build: artifacts only, nothing published.
   workflow_call:
@@ -29,6 +32,8 @@ concurrency:
 jobs:
   build:
     name: ${{ matrix.os }} ${{ matrix.arch }}
+    # Queue time does not count towards this, only running time.
+    timeout-minutes: 25
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -133,6 +138,7 @@ jobs:
     name: Publish the release
     if: ${{ inputs.release_tag != '' }}
     needs: build
+    timeout-minutes: 15
     runs-on: ubuntu-24.04
     permissions:
       contents: write
