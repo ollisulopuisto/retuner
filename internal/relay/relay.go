@@ -32,6 +32,9 @@ type Server struct {
 	Resolver  *playlist.Resolver
 	UserAgent string // Retuner/<version>
 	Pause     time.Duration
+	// Transport overrides the upstream transport (tests only). Nil: the default
+	// one, which verifies TLS certificates against the system roots.
+	Transport http.RoundTripper
 	ln        net.Listener
 }
 
@@ -161,7 +164,11 @@ func (s *Server) serve(c net.Conn) {
 		pause = reconnectPause
 	}
 	attempts, limit := 0, initialAttempts
-	client := &http.Client{Transport: &http.Transport{DialContext: (&net.Dialer{Timeout: 10 * time.Second}).DialContext, ResponseHeaderTimeout: 10 * time.Second}}
+	var rt http.RoundTripper = &http.Transport{DialContext: (&net.Dialer{Timeout: 10 * time.Second}).DialContext, ResponseHeaderTimeout: 10 * time.Second}
+	if s.Transport != nil {
+		rt = s.Transport
+	}
+	client := &http.Client{Transport: rt}
 	for {
 		before := f.bytes
 		req, err := http.NewRequest("GET", u, nil)
