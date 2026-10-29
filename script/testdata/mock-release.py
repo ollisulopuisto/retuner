@@ -105,10 +105,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if resolved != root and not resolved.startswith(root + os.sep):
                 self._send(404, "no such asset", "text/plain")
                 return
-            if not os.path.isfile(full):
+            # Pyyntöpolusta johtuva nimi on nyt normalisoitu (realpath) ja
+            # varmistettu ASSET_DIRin sisäiseksi, joten tiedosto avataan
+            # normalisoidusta polusta - ei raakasta pyynnöstä johdetusta
+            # full-polusta. Tämä katkaisee CodeQL:n py/path-injection -datan
+            # kulkun pyynnöstä tiedostopääsyyn.
+            if not os.path.isfile(resolved):
                 self._send(404, "no such asset", "text/plain")
                 return
-            with open(full, "rb") as f:
+            with open(resolved, "rb") as f:
                 body = f.read()
             self.send_response(200)
             self.send_header("Content-Type", "application/gzip")

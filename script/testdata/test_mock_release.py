@@ -73,6 +73,28 @@ def test_traversal_asset_path_is_not_served():
         server.shutdown()
 
 
+def test_symlink_asset_path_is_not_served():
+    # realpath-seuranta estää myös symlinkin kautta ASSET_DIRin ulkopuolelle
+    # osoittavan polun, joka on se suoja, jonka varassa tiedosto avataan.
+    os.makedirs(ASSET_DIR, exist_ok=True)
+    target = os.path.join(os.path.dirname(ASSET_DIR), "escape-outside.tar.gz")
+    with open(target, "wb") as f:
+        f.write(b"outside")
+    link = os.path.join(ASSET_DIR, "evil-link.tar.gz")
+    os.symlink(target, link)
+    try:
+        server = start_server()
+        try:
+            resp = get("/repos/o/r/releases/download/v1.0.0/evil-link.tar.gz")
+            assert resp.status == 404, f"expected 404, got {resp.status}"
+            resp.read()
+        finally:
+            server.shutdown()
+    finally:
+        os.remove(link)
+        os.remove(target)
+
+
 def test_legitimate_asset_is_served():
     os.makedirs(ASSET_DIR, exist_ok=True)
     asset = os.path.join(ASSET_DIR, "retuner-1.0.0-darwin-aarch64.tar.gz")
