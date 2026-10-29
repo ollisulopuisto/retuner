@@ -91,3 +91,5 @@ Smoke/Test steps hung for six hours on the old scaffold build. Fixed by curl tim
 Also added: the `Status: <code> OK` response header Pascal sends (`404 OK` too).
 
 `script/podcasts-real-parity.sh` (opt-in): six real feeds (NPR, BBC, Lex Fridman, a 20 MB Simplecast feed, Guardian, Huberman; 442 episodes listed) served as identical local bytes: lists, paging, station info and play redirects are byte-identical between Pascal and Go. Real feeds fetched by the binaries over https were not tested.
+
+Go's own https to the real Radio Browser (de1.api.radio-browser.info, catMemStr, 14:26 on 2026-10-29, manual check, no script): country list (200 items), Finland (148 stations), search "yle" (100) and popular (100) all served, no TLS or certificate errors. Pascal could not be compared here (no OpenSSL). The TTL refresh timer was not exercised against the real service.
