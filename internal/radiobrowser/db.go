@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -297,6 +298,12 @@ func (b *DB) execWithJSON(d *sql.DB, steps, path string) error {
 	return nil
 }
 
+var safeSQLIdent = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
+
+func isSafeSQLIdent(s string) bool {
+	return safeSQLIdent.MatchString(s)
+}
+
 func viewName(mac string, a *config.AVR) string {
 	return "avr" + mac + "_" + strconv.FormatUint(uint64(a.FileCRC), 10)
 }
@@ -465,16 +472,19 @@ func (b *DB) ByID(id12 string, a *config.AVR, mac string) (Station, bool) {
 	if err != nil {
 		return Station{}, false
 	}
+	if !isSafeSQLIdent(v) {
+		return Station{}, false
+	}
 	id := config.StripChars(id12, filterStripChars)
 	if len(id) < 8 {
 		return Station{}, false
 	}
 	id = id[:8] + "-" + id[8:]
 	q := strings.ReplaceAll(script("RBDB_SQL_SELECT_STATION"), "@@@AVR", v)
-	q = strings.ReplaceAll(q, "@@@ID", "'"+id+"-%'")
+	q = strings.ReplaceAll(q, "@@@ID", "?")
 	var s Station
 	var votes, bitrate, codec sql.NullString
-	if err := b.db.QueryRow(q).Scan(&s.ID, &s.Name, &s.URL, &s.Homepage, &s.Icon, &votes, &bitrate, &s.Country, &s.Language, &codec, &s.Tags); err != nil {
+	if err := b.db.QueryRow(q, id+"-%").Scan(&s.ID, &s.Name, &s.URL, &s.Homepage, &s.Icon, &votes, &bitrate, &s.Country, &s.Language, &codec, &s.Tags); err != nil {
 		return Station{}, false
 	}
 	s.Votes, s.Bitrate, s.Codec = votes.String, bitrate.String, codec.String
