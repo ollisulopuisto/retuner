@@ -59,12 +59,16 @@ func main() {
 	if cfg.Int("RadioBrowser", "Enable", 1) != 0 {
 		ct := cfg.Str("RadioBrowser", "RBCacheType")
 		if ct == "catDB" || ct == "catMemDB" || ct == "catPermMemDB" {
-			log.Printf("RBCacheType=%s needs the SQLite cache, which the Go port does not have yet; using the in-memory cache", ct)
+			// Unfinished build: refuse loudly instead of quietly serving from the live
+			// API (the Pascal default catPermMemDB means "no radio-browser traffic
+			// per request"). Radio Browser stays off until the SQLite cache is ported.
+			log.Printf("ERROR: RBCacheType=%s (SQLite cache) is not supported by this Go build yet. Radio Browser is DISABLED. Use RBCacheType=catMemStr, catFile or catNone, or the Pascal build", ct)
+		} else {
+			rb = radiobrowser.New(cfg.Str("RadioBrowser", "RBAPIURL"), "Retuner/"+config.AppVersion,
+				cfg.Int("RadioBrowser", "RBPopularAndSearchStationsLimit", 100), cfg.Int("RadioBrowser", "RBMinStationsPerCategory", 3), ct, cfg.Int("RadioBrowser", "RBCacheTTL", 0))
 		}
-		rb = radiobrowser.New(cfg.Str("RadioBrowser", "RBAPIURL"), "Retuner/"+config.AppVersion,
-			cfg.Int("RadioBrowser", "RBPopularAndSearchStationsLimit", 100), cfg.Int("RadioBrowser", "RBMinStationsPerCategory", 3), ct, cfg.Int("RadioBrowser", "RBCacheTTL", 0))
 	}
-	if rb != nil && rb.CacheType != "catDB" && rb.CacheType != "catMemDB" && rb.CacheType != "catPermMemDB" {
+	if rb != nil {
 		rb.StartUUIDs(cfg.CacheDir(), cfg.Int("RadioBrowser", "RBUUIDsCacheTTL", 0), cfg.Bool("RadioBrowser", "RBUUIDsCacheAutoRefresh"))
 	}
 	my := localIP(cfg.Str("Configuration", "IPAddress"))
