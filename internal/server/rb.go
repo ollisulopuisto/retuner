@@ -70,7 +70,7 @@ func (s *Server) rbStation(st radiobrowser.Station, genre string, r *http.Reques
 	}
 	return vtuner.Station{
 		UID: uid, Name: st.Name, Description: st.Name + " : " + st.Homepage, Location: st.Country,
-		URL: s.stripHTTPS(st.URL, r), Genre: g, Mime: strings.ToUpper(st.Codec), Bitrate: st.Bitrate,
+		URL: s.listURL(st.URL, uid, r), Genre: g, Mime: strings.ToUpper(st.Codec), Bitrate: st.Bitrate,
 		Icon:     "http://" + s.urlHost + "/" + pathRoot + "/icon?id=" + uid,
 		Bookmark: "http://" + s.urlHost + "/setupapp/favxml.asp?id=" + uid + "&fav=add",
 	}

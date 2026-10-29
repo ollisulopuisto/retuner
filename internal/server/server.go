@@ -29,6 +29,7 @@ import (
 	"retuner/internal/bookmark"
 	"retuner/internal/config"
 	"retuner/internal/dnsserver"
+	"retuner/internal/playlist"
 	"retuner/internal/radiobrowser"
 	"retuner/internal/stations"
 	"retuner/internal/vtuner"
@@ -59,6 +60,7 @@ type Server struct {
 	avrMu     sync.Mutex
 	avrs      map[string]*config.AVR
 
+	resolver  *playlist.Resolver
 	iconOnce  sync.Once
 	iconBytes []byte
 }
@@ -68,7 +70,7 @@ func New(cfg *config.Config, avr *config.AVR, urlHost string, store *stations.St
 	if size <= 0 {
 		size = 200
 	}
-	s := &Server{cfg: cfg, avr: avr, urlHost: urlHost, token: cfg.Str("Configuration", "MyToken"), iconSize: size,
+	s := &Server{resolver: &playlist.Resolver{UserAgent: "Retuner/" + config.AppVersion}, cfg: cfg, avr: avr, urlHost: urlHost, token: cfg.Str("Configuration", "MyToken"), iconSize: size,
 		placehold: true, bookmarks: cfg.Bool("Bookmark", "Enable"), bm: bm, dns: dns, rb: rb, avrs: map[string]*config.AVR{}, commonAVR: cfg.Int("Configuration", "CommonAVRini", 1) != 0, localCtry: strings.TrimSpace(cfg.Str("Configuration", "LocalCountry")), store: store, mystOn: cfg.Bool("MyStations", "Enable")}
 	if s.token == "" {
 		s.token = "0123456789ABCDEF"
@@ -82,6 +84,8 @@ func New(cfg *config.Config, avr *config.AVR, urlHost string, store *stations.St
 func (s *Server) respond(w http.ResponseWriter, code int, ctype string, body []byte) {
 	w.Header().Set("Server", "Retuner/"+config.AppVersion)
 	w.Header().Set("Content-Type", ctype)
+	// Pascal answers with a Content-Length, never chunked; some receivers need that.
+	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
 	w.WriteHeader(code)
 	if body != nil {
 		_, _ = w.Write(body)
@@ -539,11 +543,21 @@ func (s *Server) stripHTTPS(u string, r *http.Request) string {
 	return u
 }
 
+// listURL is the URL a listing hands the receiver: the stripped stream URL, or
+// our play endpoint when it is a playlist that must be unwrapped on selection.
+func (s *Server) listURL(raw, uid string, r *http.Request) string {
+	u := s.stripHTTPS(raw, r)
+	if s.cfg.Bool("Configuration", "ResolvePlaylists") && playlist.Looks(u) {
+		return "http://" + s.urlHost + "/" + pathRoot + "/play?id=" + uid
+	}
+	return u
+}
+
 func (s *Server) vtunerStation(cat string, st stations.Station, r *http.Request) vtuner.Station {
 	return vtuner.Station{
 		UID: st.ID, Name: st.Name,
 		Description: "My favorite \"" + st.Name + "\"",
-		URL:         s.stripHTTPS(st.URL, r),
+		URL:         s.listURL(st.URL, st.ID, r),
 		Icon:        "http://" + s.urlHost + "/" + pathRoot + "/icon?id=" + st.ID,
 		Genre:       cat,
 		Bookmark:    "http://" + s.urlHost + "/setupapp/favxml.asp?id=" + st.ID + "&fav=add",
@@ -608,6 +622,10 @@ func (s *Server) play(w http.ResponseWriter, r *http.Request) {
 	if target == "" {
 		s.respond(w, http.StatusNotFound, "text/html; charset=utf-8", nil)
 		return
+	}
+	// Unwrap here, when the station is selected, not when a listing is built.
+	if s.cfg.Bool("Configuration", "ResolvePlaylists") && playlist.Looks(target) {
+		target = s.stripHTTPS(s.resolver.Resolve(target), r)
 	}
 	w.Header().Set("Location", target)
 	s.respond(w, redirectCode(s.cfg), "text/html; charset=utf-8", nil)
