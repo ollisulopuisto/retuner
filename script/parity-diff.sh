@@ -1,0 +1,83 @@
+#!/bin/sh
+# Differential check: start two Retuner binaries (reference Pascal build and the
+# Go port) on a throwaway config and compare what each answers, byte for byte,
+# status code and body. Headers other than Content-Type are not compared
+# (Date/Server/Status vary by implementation).
+#
+#   ./script/parity-diff.sh <reference-binary> <go-binary>
+#
+# The Server header carries APP_VERSION, so the reference and the port must be
+# built from the same version for bodies that embed it (the about page).
+set -eu
+REF=${1:?reference binary}
+NEW=${2:?go binary}
+WORK=$(mktemp -d)
+PIDS=""
+cleanup() { for p in $PIDS; do kill "$p" 2>/dev/null || true; wait "$p" 2>/dev/null || true; done; rm -rf "$WORK"; }
+trap cleanup EXIT INT TERM
+
+start() { # $1=name $2=bin $3=port
+  mkdir -p "$WORK/$1"
+  cp "$2" "$WORK/$1/retuner"
+  cat > "$WORK/$1/retuner.ini" <<EOT
+[Configuration]
+INIVersion=1.2.2
+IPAddress=127.0.0.1
+[WebServer]
+WebServerIPAddress=127.0.0.1
+WebServerPort=$3
+[DNSServer]
+Enable=0
+[RadioBrowser]
+Enable=0
+[MyStations]
+Enable=0
+[Bookmark]
+Enable=1
+EOT
+  ( cd "$WORK/$1" && exec ./retuner -p "$3" > server.log 2>&1 ) &
+  PIDS="$PIDS $!"
+  i=0
+  while ! curl -fsS --noproxy '*' -o /dev/null "http://127.0.0.1:$3/setupapp/x/loginxml.asp?token=0" 2>/dev/null; do
+    i=$((i+1)); [ $i -gt 50 ] && { echo "$1 did not start"; cat "$WORK/$1/server.log"; exit 1; }
+    sleep 0.2
+  done
+}
+start ref "$REF" 18201
+start new "$NEW" 18202
+
+fail=0
+while IFS= read -r url; do
+  [ -z "$url" ] && continue
+  for n in ref new; do
+    port=18201; [ $n = new ] && port=18202
+    curl -s --noproxy '*' -o "$WORK/$n.body" -w '%{http_code} %{content_type} %{size_download}\n' "http://127.0.0.1:$port$url" > "$WORK/$n.meta" || true
+  done
+  if [ "${url#*/icon}" != "$url" ]; then
+    # Two JPEG encoders never agree to the byte: compare status and type only.
+    for n in ref new; do cut -d' ' -f1,2 "$WORK/$n.meta" > "$WORK/$n.meta2"; mv "$WORK/$n.meta2" "$WORK/$n.meta"; : > "$WORK/$n.body"; done
+  fi
+  if cmp -s "$WORK/ref.meta" "$WORK/new.meta" && cmp -s "$WORK/ref.body" "$WORK/new.body"; then
+    echo "  same  $url"
+  else
+    echo "  DIFF  $url"; echo "    ref: $(cat "$WORK/ref.meta")"; echo "    new: $(cat "$WORK/new.meta")"; fail=1
+  fi
+done <<'EOU'
+/setupapp/x/loginxml.asp?token=0
+/setupapp/x/loginxml.asp?mac=aabbccddee
+/setupapp/karcher/asp/BrowseXML/loginXML.asp?mac=aabbccddee
+/retuner/about?mac=aabbccddee
+/ytuner/about
+/retuner/empty
+/ytuner/empty
+/setupapp/x/statxml.asp?id=x
+/setupapp/x/statxml.asp?id=
+/setupapp/x/statxml.asp
+/setupapp/favxml.asp
+/retuner/mystations
+/retuner/icon?id=MS_AAAAAAAAAAAA
+/nothing
+/
+/retuner/doesnotexist
+EOU
+[ $fail -eq 0 ] && echo "All compared responses match." || { echo "Differences found."; exit 1; }

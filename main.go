@@ -1,61 +1,63 @@
+// Retuner (Go port, in progress). See doc/GO-PORT.md for stage and parity status.
 package main
 
 import (
 	"flag"
 	"log"
-	"retuner/http"
-	"retuner/dns"
-	"retuner/conf"
+	"net"
+	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
+	"strconv"
+
+	"retuner/internal/config"
+	"retuner/internal/server"
 )
 
+func localIP(v string) string {
+	if v != "" && v != "default" {
+		return v
+	}
+	addrs, _ := net.InterfaceAddrs()
+	for _, a := range addrs {
+		if ipn, ok := a.(*net.IPNet); ok && !ipn.IP.IsLoopback() && ipn.IP.To4() != nil {
+			return ipn.IP.String()
+		}
+	}
+	return "127.0.0.1"
+}
+
 func main() {
-	var port int
-	var configPath string
-	flag.IntVar(&port, "p", 0, "Web server port")
-	flag.StringVar(&configPath, "c", "retuner.ini", "Path to configuration file")
+	port := flag.Int("p", 0, "web server port (overrides the ini)")
+	iniPath := flag.String("c", "retuner.ini", "path to retuner.ini")
 	flag.Parse()
+	log.Printf("Retuner (Go port) - %s", config.AppCopyright)
 
-	cfg, err := conf.LoadRetunerConfig(configPath)
+	cfg, err := config.Load(*iniPath)
 	if err != nil {
-		log.Printf("Warning: failed to load config %s: %v, using defaults", configPath, err)
-		cfg = &conf.RetunerConfig{
-			WebServerPort: 80,
-			InterceptDNs:  []string{"*.vtuner.com"},
-			DNSAdvertiseIP: "127.0.0.1",
-		}
+		log.Fatalf("config: %v", err)
+	}
+	avr, err := cfg.LoadAVR()
+	if err != nil {
+		log.Fatalf("avr.ini: %v", err)
+	}
+	my := localIP(cfg.Str("Configuration", "IPAddress"))
+	urlHost := cfg.Str("Configuration", "ActAsHost")
+	if urlHost == "" || urlHost == "default" {
+		urlHost = my
 	}
 
-	if port != 0 {
-		cfg.WebServerPort = port
+	wp := cfg.Int("WebServer", "WebServerPort", 80)
+	if *port != 0 {
+		wp = *port
 	}
-
-	if cfg.DNSAdvertiseIP == "" {
-		cfg.DNSAdvertiseIP = "127.0.0.1" // Fallback to avoid DNS failing to answer
+	bind := cfg.Str("WebServer", "WebServerIPAddress")
+	if bind == "default" {
+		bind = my
 	}
-
-	// Start DNS Server (ignore failures for tests that run without privileges)
-	dnsServer := dns.NewServer(cfg.InterceptDNs, cfg.DNSAdvertiseIP)
-	go func() {
-		log.Printf("Starting DNS Server on :53")
-		if err := dnsServer.Start(53); err != nil {
-			log.Printf("Warning: DNS server failed to start: %v", err)
-		}
-	}()
-
-	// Start HTTP Server
-	httpServer := http.NewServer()
-	go func() {
-		log.Printf("Starting HTTP Server on :%d", cfg.WebServerPort)
-		if err := httpServer.Start(cfg.WebServerPort); err != nil && err.Error() != "http: Server closed" {
-			log.Fatalf("HTTP server failed: %v", err)
-		}
-	}()
-
-	// Wait for termination signal
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	<-sig
+	addr := net.JoinHostPort(bind, strconv.Itoa(wp))
+	log.Printf("Web Service: listening on: %s", addr)
+	if err := http.ListenAndServe(addr, server.New(cfg, avr, urlHost).Handler()); err != nil {
+		log.Printf("web service: %v", err)
+		os.Exit(1)
+	}
 }
