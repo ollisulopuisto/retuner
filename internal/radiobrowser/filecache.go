@@ -204,3 +204,32 @@ func (c *Client) fromListFiles(uuid, mac string, a *config.AVR) (Station, bool) 
 	}
 	return Station{}, false
 }
+
+// RemoveOldCacheFiles is Pascal's RemoveOldRBCacheFiles: at startup, with a
+// TTL set, every "RB*-*.cache" file in the cache folder (not recursive) older
+// than ttlHours is deleted. It runs whether or not Radio Browser is enabled.
+// It returns the number of files removed.
+func RemoveOldCacheFiles(dir string, ttlHours int) int {
+	if ttlHours <= 0 {
+		return 0
+	}
+	files, err := filepath.Glob(filepath.Join(dir, "RB*-*.cache"))
+	if err != nil {
+		return 0
+	}
+	removed := 0
+	ttl := time.Duration(ttlHours) * time.Hour
+	for _, f := range files {
+		st, err := os.Stat(f)
+		if err != nil || st.IsDir() {
+			continue
+		}
+		if time.Since(st.ModTime()) > ttl && os.Remove(f) == nil {
+			removed++
+		}
+	}
+	if removed > 0 {
+		log.Printf("DEBUG: old cache removed")
+	}
+	return removed
+}

@@ -60,6 +60,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("avr.ini: %v", err)
 	}
+	radiobrowser.RemoveOldCacheFiles(cfg.CacheDir(), cfg.Int("RadioBrowser", "RBCacheTTL", 0))
 	var rb *radiobrowser.Client
 	if cfg.Int("RadioBrowser", "Enable", 1) != 0 {
 		ct := cfg.Str("RadioBrowser", "RBCacheType")
