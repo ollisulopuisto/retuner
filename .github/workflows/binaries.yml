@@ -7,6 +7,24 @@ on:
   pull_request:
     branches:
       - master
+  # Called by release.yml, which passes the tag to publish (e.g. v26.08.28.4).
+  # Without a tag this is the ordinary build: artifacts only, nothing published.
+  workflow_call:
+    inputs:
+      release_tag:
+        description: 'Publish the build as this tag, e.g. v26.08.28.4'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+# A push supersedes the run before it. A called run carries its tag in the
+# group, so a release is never superseded by the next push.
+concurrency:
+  group: binaries-${{ inputs.release_tag || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -24,7 +42,9 @@ jobs:
             runner: ubuntu-24.04-arm
           - os: darwin
             arch: amd64
-            runner: macos-13
+            # macos-13 was retired (Dec 2025). macos-15-intel is GitHub's documented
+            # Intel replacement label, announced as available until August 2027.
+            runner: macos-15-intel
           - os: darwin
             arch: arm64
             runner: macos-latest
@@ -65,7 +85,17 @@ jobs:
         id: package
         shell: bash
         run: |
-          version="2.0.0"
+          # The release tag when release.yml called this, else the version
+          # written down in src/common.pas (the Go binary reports the same one;
+          # internal/config has a test that keeps them equal). The updater asks
+          # for retuner-<tag without v>-<target>.tar.gz.
+          tag="${{ inputs.release_tag }}"
+          if [ -n "$tag" ]; then
+            version="${tag#v}"
+          else
+            version=$(sed -n "s/^ *APP_VERSION *= *'\([0-9.]*\)'.*/\1/p" src/common.pas)
+          fi
+          [ -n "$version" ] || { echo "no version"; exit 1; }
 
           out_arch="${{ matrix.arch }}"
           if [ "$out_arch" = "amd64" ]; then
@@ -98,3 +128,38 @@ jobs:
           name: ${{ steps.package.outputs.name }}
           path: ${{ steps.package.outputs.name }}.tar.gz
           if-no-files-found: error
+
+  release:
+    name: Publish the release
+    if: ${{ inputs.release_tag != '' }}
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/download-artifact@v4.1.8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          ls -l dist
+          tag=$RELEASE_TAG
+          # The updater verifies against this file.
+          ( cd dist && sha256sum ./*.tar.gz | sed 's| \./| |' > SHA256SUMS )
+          cat dist/SHA256SUMS
+          notes="doc/release-notes/$tag.md"
+          if [ -f "$notes" ]; then
+            set -- --notes-file "$notes"
+          else
+            set -- --generate-notes
+          fi
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/*.tar.gz dist/SHA256SUMS --clobber
+          else
+            gh release create "$tag" dist/*.tar.gz dist/SHA256SUMS --title "Retuner $tag" "$@"
+          fi
