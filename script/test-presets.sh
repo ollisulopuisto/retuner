@@ -63,7 +63,7 @@ start_repo() {
   REPO_PID=$!
   i=0
   while [ "$i" -lt 50 ]; do
-    if curl -fsS --noproxy '*' -o /dev/null "http://127.0.0.1:$REPO_PORT/fi.ini" 2>/dev/null; then
+    if curl -fsS --noproxy '*' --max-time 15 -o /dev/null "http://127.0.0.1:$REPO_PORT/fi.ini" 2>/dev/null; then
       return 0
     fi
     i=$((i + 1)); sleep 0.2
@@ -117,7 +117,7 @@ start_server() {
   PID=$!
   i=0
   while [ "$i" -lt 50 ]; do
-    if curl -fsS --noproxy '*' -o /dev/null \
+    if curl -fsS --noproxy '*' --max-time 15 -o /dev/null \
          "http://127.0.0.1:$PORT/setupapp/x/loginxml.asp?token=0" 2>/dev/null; then
       return 0
     fi
@@ -135,7 +135,7 @@ stop_server() {
   fi
 }
 
-body() { curl -fsS --noproxy '*' "http://127.0.0.1:$PORT$1" 2>/dev/null || true; }
+body() { curl -fsS --noproxy '*' --max-time 15 "http://127.0.0.1:$PORT$1" 2>/dev/null || true; }
 
 has() {
   if printf '%s' "$2" | grep -q "$3"; then

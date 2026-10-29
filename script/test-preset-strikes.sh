@@ -67,7 +67,7 @@ start_mock() { # $1 = port, remaining = paths that should 404
   MOCK_PID=$!
   i=0
   while [ "$i" -lt 50 ]; do
-    if curl -fsS --noproxy '*' -o /dev/null "http://127.0.0.1:$port/up" 2>/dev/null; then
+    if curl -fsS --noproxy '*' --max-time 15 -o /dev/null "http://127.0.0.1:$port/up" 2>/dev/null; then
       return 0
     fi
     kill -0 "$MOCK_PID" 2>/dev/null || { echo "error: mock died" >&2; exit 1; }
