@@ -48,7 +48,18 @@ func (s *Store) path(mac string) string {
 	if s.Common || !safeMAC.MatchString(mac) {
 		mac = "bookmark"
 	}
-	return filepath.Join(s.Dir, mac+".xml")
+
+	candidate := filepath.Join(s.Dir, mac+".xml")
+	baseAbs, err1 := filepath.Abs(s.Dir)
+	candidateAbs, err2 := filepath.Abs(candidate)
+	if err1 != nil || err2 != nil {
+		return filepath.Join(s.Dir, "bookmark.xml")
+	}
+	rel, err := filepath.Rel(baseAbs, candidateAbs)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return filepath.Join(s.Dir, "bookmark.xml")
+	}
+	return candidateAbs
 }
 
 type xmlItem struct {
