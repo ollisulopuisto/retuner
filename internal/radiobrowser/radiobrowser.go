@@ -375,8 +375,11 @@ func (c *Client) Categories(k Kind, a *config.AVR, mac string, start, howMany in
 	var all []Category
 	for _, m := range parseArray(c.get(addBulk(p))) {
 		if categoryAllowed(m, k, a, c.MinPerCat) {
-			n, _ := strconv.Atoi(str(m, "stationcount"))
-			all = append(all, Category{clean(str(m, "name")), n})
+			n64, err := strconv.ParseInt(str(m, "stationcount"), 10, 32)
+			if err != nil {
+				continue
+			}
+			all = append(all, Category{clean(str(m, "name")), int(n64)})
 		}
 	}
 	if len(all) > 0 {
