@@ -694,15 +694,23 @@ func (s *Server) bookmarkList(w http.ResponseWriter, r *http.Request) {
 // user's own list resolve here so far; the Pascal handler answers "No
 // station(s) found" for an id it cannot look up, and otherwise answers an empty
 // 200 once the file is updated (it never writes a body for the call itself).
+var safeBookmarkMAC = regexp.MustCompile(`^[A-Za-z0-9_-]{1,32}$`)
+
 func (s *Server) favorite(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	id := q.Get("id")
+	mac := q.Get("mac")
+	fav := q.Get("fav")
+	if !safeBookmarkMAC.MatchString(mac) {
+		s.respond(w, http.StatusBadRequest, "text/html; charset=utf-8", nil)
+		return
+	}
 	if len(id) >= 3 && id[:2] == stations.Prefix {
 		if cat, st, ok := s.store.ByID(id); ok {
 			vs := s.vtunerStation(cat, st, r)
 			it := bookmark.Item{ID: strings.Replace(vs.UID, "_", "B", 1), Name: vs.Name, URL: vs.URL, Desc: vs.Description,
 				Logo: vs.Icon, Format: vs.Genre, Location: vs.Location, Bandwidth: vs.Bitrate, Mime: "", Relia: "3", Bookmark: vs.Bookmark}
-			s.bm.Set(q.Get("mac"), q.Get("fav"), it)
+			s.bm.Set(mac, fav, it)
 			w.Header().Set("Content-Type", "text/html")
 			w.WriteHeader(http.StatusOK)
 			return
