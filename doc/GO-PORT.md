@@ -38,7 +38,10 @@ like the Pascal release for the same requests.
 | presets (presets.pas)                               | done*   | test-presets.sh 15/15 (Pascal also 15/15), unit tests. *Oversize download cap behaviour (Pascal terminates the transfer) only assumed |
 | podcasts (podcasts.pas)                             | todo    | |
 | DNS server (dnsserver.pas)                          | partial | miekg/dns. fuzz-test.sh DNS phase passes (malformed packets, intercept list 14/14, control name); dns-parity.sh: raw replies identical for 8 cases (A, AAAA, MX, case, apex, not intercepted without upstream). Go unit tests (loopback upstream) cover forwarding, RestrictForwarding, AllowedClients, 24 h known-client expiry and upstream-down (rcode 4); still NOT compared against Pascal on the wire (needs a controllable upstream for the reference binary). TCP is not offered, matching the Pascal comment that interception is UDP only. Later fuzz-test phases (radio-browser, icons) fail until those are ported |
-| web GUI / remote / relay / maintenance / updater    | todo    | test-webgui.sh, test-remote.sh, test-update.sh |
+| web GUI stations editor (webgui.pas)                | done*   | test-webgui.sh 13/13 (Pascal 13/13); webgui-parity.sh: pages, JSON replies (same fpjson layout), save-to-ini output identical. *Divergence: a body that is not JSON answers "Malformed request." instead of the Pascal parser message. Listener takes all interfaces and filters by WebGUIIPAddress, like the release build |
+| receiver remote (avrremote.pas)                     | done*   | test-remote.sh 42/42 checks (Pascal 42) against mock-denon. *Network error wording differs (Go net errors); not tested against a real receiver |
+| updater (script/retuner-update.sh)                  | done*   | test-update.sh 32/32 for Pascal and Go. *The shell script is shared; it had a pre-existing `-p "$PORT"` bug on master (fixed). The Go binary is only probed, not self-updating |
+| relay / maintenance / podcasts / translator         | todo    | no suite beyond test-leaks (not meaningful yet) |
 | translator, threadtimer                             | todo    | |
 
 ## Notes

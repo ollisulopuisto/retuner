@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"retuner/internal/fpjson"
 	"retuner/internal/stations"
 )
 
@@ -58,7 +59,7 @@ type unsupportedRemote struct{}
 const noRemote = "Receiver remote control is not supported by this Go build yet."
 
 func (unsupportedRemote) Status() string {
-	return `{"ok":false,"error":"` + noRemote + `"}`
+	return remoteErr(noRemote)
 }
 func (unsupportedRemote) Command(string) string { return noRemote }
 func (unsupportedRemote) Select(int) string     { return noRemote }
@@ -143,14 +144,20 @@ type jobj = map[string]any
 func sendJSON(w http.ResponseWriter, code int, body string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	io.WriteString(w, body)
+	io.WriteString(w, body+"\n")
 }
 
-func errJSON(msg string) string { b, _ := json.Marshal(jobj{"error": msg}); return string(b) }
+func errJSON(msg string) string {
+	return fpjson.Marshal(struct {
+		Error string `json:"error"`
+	}{msg})
+}
 
 func remoteErr(msg string) string {
-	b, _ := json.Marshal(jobj{"ok": false, "error": msg})
-	return string(b)
+	return fpjson.Marshal(struct {
+		OK    bool   `json:"ok"`
+		Error string `json:"error"`
+	}{false, msg})
 }
 
 func (s *Server) stationsJSON() string {
@@ -171,12 +178,11 @@ func (s *Server) stationsJSON() string {
 		}
 		cats = append(cats, x)
 	}
-	b, _ := json.Marshal(struct {
+	return fpjson.Marshal(struct {
 		Categories []cat  `json:"categories"`
 		File       string `json:"file"`
 		ReadOnly   bool   `json:"readonly"`
 	}{cats, s.FileName, s.isYAML()})
-	return string(b)
 }
 
 func (s *Server) statusJSON() string {
@@ -185,14 +191,13 @@ func (s *Server) statusJSON() string {
 	for _, c := range g {
 		n += len(c.Stations)
 	}
-	b, _ := json.Marshal(struct {
+	return fpjson.Marshal(struct {
 		App        string `json:"app"`
 		Version    string `json:"version"`
 		Categories int    `json:"categories"`
 		Stations   int    `json:"stations"`
 		File       string `json:"file"`
 	}{s.AppName, s.Version, len(g), n, s.FileName})
-	return string(b)
 }
 
 // save writes the editor's JSON back as a stations.ini (saveStationsFromJSON).
