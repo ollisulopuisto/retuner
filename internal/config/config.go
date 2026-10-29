@@ -4,6 +4,7 @@
 package config
 
 import (
+	"hash/crc32"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -105,6 +106,7 @@ func (c *Config) folder(key, sub string) string {
 }
 
 func (c *Config) ConfigDir() string { return c.folder("ConfigFolderLocation", "config") }
+func (c *Config) DBDir() string     { return c.folder("DBFolderLocation", "db") }
 func (c *Config) CacheDir() string  { return c.folder("CacheFolderLocation", "cache") }
 
 // MoveConfigFiles moves stations files and *.xml (bookmarks) that sit beside the
@@ -157,6 +159,8 @@ type AVR struct {
 	Reverse bool
 	// [Translator] - parsed and kept; the translation itself is not ported yet.
 	Translator Translator
+	// FileCRC is the CRC-32 of the ini file as saved; it names the per-receiver SQL view.
+	FileCRC uint32
 }
 
 type Translator struct {
@@ -241,7 +245,11 @@ func (c *Config) LoadAVRFile(name string) (*AVR, error) {
 			return nil, err
 		}
 	}
-	a := &AVR{Protocol: strings.ToLower(f.Section("Configuration").Key("Protocol").String())}
+	var fileCRC uint32
+	if b, e := os.ReadFile(p); e == nil {
+		fileCRC = crc32.ChecksumIEEE(b)
+	}
+	a := &AVR{FileCRC: fileCRC, Protocol: strings.ToLower(f.Section("Configuration").Key("Protocol").String())}
 	a.AllAsHTTP = a.Protocol == "all-as-http"
 	rf := f.Section("RadioBrowser Filtering")
 	a.AllowedTags, a.NotAllowedTags = filterList(rf.Key("AllowedTags").String()), filterList(rf.Key("NotAllowedTags").String())

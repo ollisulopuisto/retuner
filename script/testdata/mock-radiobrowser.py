@@ -105,8 +105,12 @@ class H(BaseHTTPRequestHandler):
             self._send(COUNTRIES)
         elif p.startswith("/json/stations"):
             self._send(STATION_JSON)
-        elif p in ("/json/tags", "/json/languages"):
-            self._send([])
+        elif p == "/json/tags":
+            self._send([{"name": "test", "stationcount": len(STATIONS)}])
+        elif p == "/json/languages":
+            self._send([{"name": "testish", "stationcount": len(STATIONS), "iso_639": "ts"}])
+        elif p == "/json/codecs":
+            self._send([{"name": c, "stationcount": 1} for c in sorted({r[3] for r in STATIONS})])
         elif p == "/json/servers":
             self._send([{"name": "127.0.0.1", "ip": "127.0.0.1"}])
         else:

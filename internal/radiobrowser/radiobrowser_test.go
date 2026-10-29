@@ -72,7 +72,7 @@ func TestCacheStopsSecondRequestAndNeverCachesEmpty(t *testing.T) {
 		t.Fatalf("%d upstream requests for two identical lists", hits)
 	}
 	// A listed station is found again by its 12 character id without a request.
-	if st, ok := c.ByID("0000000a1111", ""); !ok || st.Name != "A b" {
+	if st, ok := c.ByID("0000000a1111", &config.AVR{}, ""); !ok || st.Name != "A b" {
 		t.Fatal("by id from cache")
 	}
 	if hits != 2 { // only the uuid index was fetched

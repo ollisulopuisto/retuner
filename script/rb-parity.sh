@@ -40,7 +40,8 @@ Enable=0
 Enable=1
 RBAPIURL=http://127.0.0.1:$4
 RBMinStationsPerCategory=1
-RBCacheType=catMemStr
+RBCacheType=${RB_CACHE:-catMemStr}
+DBLibFile=default
 [MyStations]
 Enable=0
 [Bookmark]

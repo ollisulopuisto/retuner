@@ -58,17 +58,31 @@ func main() {
 	var rb *radiobrowser.Client
 	if cfg.Int("RadioBrowser", "Enable", 1) != 0 {
 		ct := cfg.Str("RadioBrowser", "RBCacheType")
+		rb = radiobrowser.New(cfg.Str("RadioBrowser", "RBAPIURL"), "Retuner/"+config.AppVersion,
+			cfg.Int("RadioBrowser", "RBPopularAndSearchStationsLimit", 100), cfg.Int("RadioBrowser", "RBMinStationsPerCategory", 3), ct, cfg.Int("RadioBrowser", "RBCacheTTL", 0))
 		if ct == "catDB" || ct == "catMemDB" || ct == "catPermMemDB" {
-			// Unfinished build: refuse loudly instead of quietly serving from the live
-			// API (the Pascal default catPermMemDB means "no radio-browser traffic
-			// per request"). Radio Browser stays off until the SQLite cache is ported.
-			log.Printf("ERROR: RBCacheType=%s (SQLite cache) is not supported by this Go build yet. Radio Browser is DISABLED. Use RBCacheType=catMemStr, catFile or catNone, or the Pascal build", ct)
-		} else {
-			rb = radiobrowser.New(cfg.Str("RadioBrowser", "RBAPIURL"), "Retuner/"+config.AppVersion,
-				cfg.Int("RadioBrowser", "RBPopularAndSearchStationsLimit", 100), cfg.Int("RadioBrowser", "RBMinStationsPerCategory", 3), ct, cfg.Int("RadioBrowser", "RBCacheTTL", 0))
+			// As in Pascal the database is prepared before serving. A failure
+			// disables Radio Browser; it never falls back to per-request live calls.
+			dbDir := cfg.DBDir()
+			db, err := rb.PrepareDB(dbDir, ct, cfg.Int("RadioBrowser", "RBCacheTTL", 0))
+			if err != nil {
+				log.Printf("ERROR: Radio Browser database: %v. Radio Browser is DISABLED", err)
+				rb = nil
+			} else {
+				rb.DB = db
+				if ttl := cfg.Int("RadioBrowser", "RBCacheTTL", 0); ttl > 0 {
+					go func() {
+						for range time.Tick(time.Duration(ttl) * time.Hour) {
+							if err := db.Refresh(); err != nil {
+								log.Printf("Radio Browser database refresh failed, keeping the old one: %v", err)
+							}
+						}
+					}()
+				}
+			}
 		}
 	}
-	if rb != nil {
+	if rb != nil && rb.DB == nil { // the database answers id lookups itself
 		rb.StartUUIDs(cfg.CacheDir(), cfg.Int("RadioBrowser", "RBUUIDsCacheTTL", 0), cfg.Bool("RadioBrowser", "RBUUIDsCacheAutoRefresh"))
 	}
 	my := localIP(cfg.Str("Configuration", "IPAddress"))

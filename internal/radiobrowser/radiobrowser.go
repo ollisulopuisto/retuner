@@ -62,6 +62,7 @@ type Client struct {
 	HideBroken bool
 	CacheType  string // catNone disables caching; everything else is the memory cache
 	TTL        time.Duration
+	DB         *DB // set for the SQLite cache types
 
 	mu    sync.Mutex
 	cache map[string]cached
@@ -352,6 +353,9 @@ func page[T any](all []T, start, howMany int) []T {
 // Categories lists genres, countries or languages for one receiver (mac "" is
 // the common config). total is the count after filtering, before paging.
 func (c *Client) Categories(k Kind, a *config.AVR, mac string, start, howMany int) ([]Category, int) {
+	if c.DB != nil {
+		return c.DB.Categories(k, a, mac, start, howMany)
+	}
 	key := "RBC-" + mac + "-" + strconv.Itoa(int(k))
 	if e, ok := c.lookup(key); ok && len(e.cats) > 0 {
 		return page(e.cats, start, howMany), len(e.cats)
@@ -377,6 +381,9 @@ func (c *Client) Categories(k Kind, a *config.AVR, mac string, start, howMany in
 // name is the category as it appears in the request path (still URL-encoded) or
 // the search text.
 func (c *Client) Stations(k Kind, name string, a *config.AVR, mac string, start, howMany int) ([]Station, int) {
+	if c.DB != nil {
+		return c.DB.Stations(k, name, a, mac, start, howMany)
+	}
 	key := "RBS-" + mac + "-" + strconv.Itoa(int(k)) + "-" + hash(name)
 	if e, ok := c.lookup(key); ok && len(e.stations) > 0 {
 		return page(e.stations, start, howMany), len(e.stations)
@@ -477,7 +484,10 @@ func (c *Client) refreshUUIDs(path string) {
 
 // ByID resolves the 12 hex characters of a receiver-side id (RB_xxxxxxxxxxxx)
 // to a station. The full UUID list is fetched once.
-func (c *Client) ByID(id12, mac string) (Station, bool) {
+func (c *Client) ByID(id12 string, a *config.AVR, mac string) (Station, bool) {
+	if c.DB != nil {
+		return c.DB.ByID(id12, a, mac)
+	}
 	if len(id12) != 12 {
 		return Station{}, false
 	}

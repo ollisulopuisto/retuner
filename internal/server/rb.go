@@ -58,8 +58,8 @@ func (s *Server) rbByID(id string, r *http.Request) (radiobrowser.Station, bool)
 	if s.rb == nil || len(id) < 15 || !strings.HasPrefix(id, "RB_") {
 		return radiobrowser.Station{}, false
 	}
-	_, mac := s.avrFor(r)
-	return s.rb.ByID(id[3:15], mac)
+	a, mac := s.avrFor(r)
+	return s.rb.ByID(id[3:15], a, mac)
 }
 
 func (s *Server) rbStation(st radiobrowser.Station, genre string, r *http.Request) vtuner.Station {
@@ -125,11 +125,18 @@ func parseInt(s string) (int, bool) {
 func (s *Server) rbRoot(w http.ResponseWriter, r *http.Request) {
 	a, mac := s.avrFor(r)
 	count := func(k radiobrowser.Kind) int { _, n := s.rb.Categories(k, a, mac, 0, 1); return n }
+	popular := s.rb.PopLimit
+	if s.rb.DB != nil {
+		if g, c, l, pop, ok := s.rb.DB.RootCounts(a, mac); ok {
+			count = func(k radiobrowser.Kind) int { return [...]int{g, c, l}[k] }
+			popular = pop
+		}
+	}
 	p := &vtuner.Page{TotalItemsCount: 4}
 	p.Add(s.dir("Genres", pathRoot+"/radiobrowser/genre", count(radiobrowser.Genre)))
 	p.Add(s.dir("Countries", pathRoot+"/radiobrowser/country", count(radiobrowser.Country)))
 	p.Add(s.dir("Languages", pathRoot+"/radiobrowser/language", count(radiobrowser.Language)))
-	p.Add(s.dir("Most popular", pathRoot+"/radiobrowser/popular", s.rb.PopLimit))
+	p.Add(s.dir("Most popular", pathRoot+"/radiobrowser/popular", popular))
 	s.page(w, p)
 }
 
