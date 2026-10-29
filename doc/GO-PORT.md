@@ -28,7 +28,7 @@ like the Pascal release for the same requests.
 | Area (Pascal unit)                                  | Go      | Evidence |
 |-----------------------------------------------------|---------|----------|
 | vTuner XML (vtuner.pas)                             | done    | unit tests + parity-diff |
-| ini defaults + avr.ini (common.pas, avr.pas)        | partial | smoke-test default-port checks pass; INIVersion upgrade/outdated-notice not ported |
+| ini defaults + avr.ini (common.pas, avr.pas)        | partial | smoke-test default-port checks pass; INIVersion: iniversion-parity.sh (version missing/old in retuner.ini and avr.ini) leaves the same INIVersion lines in both files and logs the same warning text as Pascal (log prefix/timestamp not compared; tested for the common avr.ini only, not <mac>.ini); key order inside a rewritten file can differ |
 | login/about/empty/statxml routes, /ytuner/ legacy, Frontier deep path | done | smoke-test 14/14, parity-diff 16/16 |
 | icon placeholder (httpserver.pas)                   | partial | placeholder only; station logo fetch/scale/cache not ported |
 | my stations (my_stations.pas)                       | partial | ini+yaml parse, merge incl. preset files, own-file auto refresh by content CRC, config-dir migration, paging, play redirect, id lookup; parity-diff 28 same. Not ported: relay URLs, ResolvePlaylists, logo fetch |

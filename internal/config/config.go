@@ -5,6 +5,7 @@ package config
 
 import (
 	"hash/crc32"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -58,7 +59,21 @@ func Load(path string) (*Config, error) {
 			return nil, lerr
 		}
 	}
-	changed := fill(f, defaults)
+	// retuner.pas: warn about a missing or outdated INIVersion, then always
+	// store the current one.
+	changed := false
+	if sec := f.Section("Configuration"); !sec.HasKey("INIVersion") {
+		if _, err := os.Stat(path); err == nil {
+			log.Printf("WARNING: You are running out of INI file! Some features may not work properly!")
+			log.Printf("WARNING: Retuner will try to fill in the missing options, but check their description and usage on https://github.com/ollisulopuisto/retuner/tree/master/cfg.")
+		}
+	} else if sec.Key("INIVersion").String() != IniVersion {
+		log.Printf("WARNING: Your retuner.ini file is outdated! Some features may not work properly!")
+		log.Printf("WARNING: Retuner will try to fill in the missing options, but check their description and usage on https://github.com/ollisulopuisto/retuner/tree/master/cfg.")
+		sec.Key("INIVersion").SetValue(IniVersion)
+		changed = true
+	}
+	changed = fill(f, defaults) || changed
 	if changed {
 		ini.PrettyFormat = false // "Key=Value", as the Pascal writer and the shell suites expect
 		if err := f.SaveTo(path); err != nil {
@@ -237,6 +252,12 @@ func (c *Config) LoadAVRFile(name string) (*AVR, error) {
 		sec.Key("IdentifiersList").SetValue(strings.Join(defaultMenuIDs, ";"))
 		sec.Key("LabelsList").SetValue(strings.Join(defaultMenuLabels, ";"))
 		ids, labels = defaultMenuIDs, defaultMenuLabels
+		changed = true
+	}
+	if v := f.Section("Configuration").Key("INIVersion"); v.String() != avrIniVersion {
+		log.Printf("WARNING: Your %s file is outdated! Some features may not work properly!", name)
+		log.Printf("WARNING: Your %s file will be updated with new options right now. Check https://github.com/coffeegreg/YTuner/cfg for the description of appropriate avr.ini file for your version of YTuner", name)
+		v.SetValue(avrIniVersion)
 		changed = true
 	}
 	if changed {
