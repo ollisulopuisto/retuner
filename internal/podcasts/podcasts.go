@@ -7,15 +7,18 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/xml"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"gopkg.in/ini.v1"
 )
@@ -115,15 +118,67 @@ type node struct {
 	isText   bool
 }
 
+var declaredEncoding = regexp.MustCompile(`^\s*<\?xml[^>]*encoding\s*=\s*["']([^"']+)["']`)
+
+// replaceInvalidUTF8 turns every byte that is not valid UTF-8 into '?', which is
+// what Pascal's reader does with a feed that declares (or defaults to) UTF-8.
+func replaceInvalidUTF8(b []byte) []byte {
+	if utf8.Valid(b) {
+		return b
+	}
+	out := make([]byte, 0, len(b))
+	for len(b) > 0 {
+		r, n := utf8.DecodeRune(b)
+		if r == utf8.RuneError && n == 1 {
+			out = append(out, '?')
+		} else {
+			out = append(out, b[:n]...)
+		}
+		b = b[n:]
+	}
+	return out
+}
+
+func qname(n xml.Name) string {
+	if n.Space != "" {
+		return n.Space + ":" + n.Local
+	}
+	return n.Local
+}
+
 func parseXML(b []byte) (*node, error) {
+	b = bytes.TrimPrefix(b, []byte("\xef\xbb\xbf"))
+	latin1 := false
+	if m := declaredEncoding.FindSubmatch(b); m != nil {
+		switch strings.ToLower(string(m[1])) {
+		case "iso-8859-1", "latin1", "latin-1", "iso_8859-1":
+			latin1 = true
+		}
+	}
+	if !latin1 {
+		b = replaceInvalidUTF8(b)
+	}
 	dec := xml.NewDecoder(bytes.NewReader(b))
 	dec.Strict = true
-	dec.CharsetReader = func(_ string, in io.Reader) (io.Reader, error) { return in, nil }
+	dec.CharsetReader = func(label string, in io.Reader) (io.Reader, error) {
+		if latin1 {
+			raw, err := io.ReadAll(in)
+			if err != nil {
+				return nil, err
+			}
+			rs := make([]rune, len(raw))
+			for i, c := range raw {
+				rs[i] = rune(c)
+			}
+			return strings.NewReader(string(rs)), nil
+		}
+		return in, nil
+	}
 	root := &node{}
 	cur := root
 	var stack []*node
 	for {
-		tok, err := dec.Token()
+		tok, err := dec.RawToken()
 		if err == io.EOF {
 			break
 		}
@@ -132,14 +187,19 @@ func parseXML(b []byte) (*node, error) {
 		}
 		switch t := tok.(type) {
 		case xml.StartElement:
-			n := &node{name: t.Name.Local, attrs: map[string]string{}}
+			// RawToken keeps the prefix: Pascal's DOM matches the whole
+			// qualified name, so itunes:title is not title.
+			n := &node{name: qname(t.Name), attrs: map[string]string{}}
 			for _, a := range t.Attr {
-				n.attrs[a.Name.Local] = a.Value
+				n.attrs[qname(a.Name)] = a.Value
 			}
 			cur.children = append(cur.children, n)
 			stack = append(stack, cur)
 			cur = n
 		case xml.EndElement:
+			if len(stack) == 0 || cur.name != qname(t.Name) {
+				return nil, fmt.Errorf("element <%s> closed by </%s>", cur.name, qname(t.Name))
+			}
 			cur = stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
 		case xml.CharData:

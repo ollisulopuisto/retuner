@@ -25,6 +25,8 @@ Empty=http://127.0.0.1:$M/empty.xml
 NoAudio=http://127.0.0.1:$M/noaudio.xml
 Bad=http://127.0.0.1:$M/bad.xml
 NotRSS=http://127.0.0.1:$M/notrss.xml
+[Exotic]
+$(for n in cdata entities ns image bom latin1 badutf8 single upper comment doctype two-enc ws longtitle nested unclosed atom; do echo "X$n=http://127.0.0.1:$M/x-$n.xml"; done)
 Gone=http://127.0.0.1:$M/gone.xml
 EOT
   cat > "$W/$1/retuner.ini" <<EOT

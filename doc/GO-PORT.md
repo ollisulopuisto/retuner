@@ -72,3 +72,15 @@ This repository has no AGENTS.md, CODEX.md, board, roadmap, TODO or bugs file (c
 - Earlier packaging notes: `script/build.sh` and the `build` workflow already build and package Go (from the scaffold commit). Checked locally: `script/build.sh` builds this branch, and the archive laid out as the workflow does (`retuner-<ver>-<target>/retuner`, `retuner.ini`, `config/`) extracts and starts. Not changed on this branch (no workflow edits). Existing mismatch worth a human look: `binaries.yml` hard-codes version `2.0.0` in the archive name, while `script/retuner-update.sh` asks for `retuner-<release tag>-<target>.tar.gz` and `release.yml` reads the version from `src/common.pas`. The Go binary's AppVersion is pinned to 26.08.28.4 to match the Pascal release.
 - Open work, in order: the gaps in the table above (real receivers, real Radio Browser data, TLS relay upstream, real podcast feeds, podcast icon/favourite/relay checks, online translation unsupported by choice).
 - Blockers: none at the time of writing.
+
+## Podcast exotic-feed parity (added)
+
+`script/podcasts-parity.sh` now also serves ~17 odd feeds (CDATA, entities, namespaces, BOM, Latin-1, invalid UTF-8, doctype, comments, unclosed, Atom, ...). First comparison found three real differences, now fixed and matching Pascal (bodies, headers, request counts):
+1. `itunes:title` before `title` - Go matched the prefixed element; now element names keep their prefix.
+2. ISO-8859-1 feeds were not decoded; now converted. Invalid UTF-8 bytes become `?`; a BOM is stripped.
+3. Mismatched end tags are a parse error (as in Pascal), so fetch counts agree.
+Caveat: only these synthetic feeds were compared; real-world feeds are untested.
+
+## CI note
+
+Smoke/Test steps hung for six hours on the old scaffold build. Fixed by curl timeouts in `script/` and job timeouts in the workflows; push runs are limited to master, PRs run on their merge result, `workflow_dispatch` is check-only. `release.yml` is the only release path.
