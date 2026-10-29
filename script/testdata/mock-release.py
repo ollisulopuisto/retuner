@@ -109,7 +109,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if resolved is None:
                 self._send(404, "no such asset", "text/plain")
                 return
-            with open(resolved, "rb") as f:
+            # O_NOFOLLOW: a file swapped for a symlink between the listing and
+            # this open is refused instead of followed (test server, local use).
+            try:
+                fd = os.open(resolved, os.O_RDONLY | os.O_NOFOLLOW)
+            except OSError:
+                self._send(404, "no such asset", "text/plain")
+                return
+            with os.fdopen(fd, "rb") as f:
                 body = f.read()
             self.send_response(200)
             self.send_header("Content-Type", "application/gzip")
