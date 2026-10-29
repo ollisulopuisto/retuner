@@ -3,8 +3,8 @@
 // public JSON API, are filtered per receiver (avr.ini [RadioBrowser Filtering])
 // and cached in memory.
 //
-// Not ported: the SQLite cache types (catDB, catMemDB, catPermMemDB) and the
-// on-disk catFile cache. Those settings fall back to the in-memory cache and
+// catFile: see filecache.go. Before that, those settings fell back to the
+// in-memory cache and
 // the live API; see doc/GO-PORT.md.
 package radiobrowser
 
@@ -62,7 +62,8 @@ type Client struct {
 	HideBroken bool
 	CacheType  string // catNone disables caching; everything else is the memory cache
 	TTL        time.Duration
-	DB         *DB // set for the SQLite cache types
+	DB         *DB    // set for the SQLite cache types
+	CacheDir   string // catFile: where the .cache files live
 
 	mu    sync.Mutex
 	cache map[string]cached
@@ -357,7 +358,14 @@ func (c *Client) Categories(k Kind, a *config.AVR, mac string, start, howMany in
 		return c.DB.Categories(k, a, mac, start, howMany)
 	}
 	key := "RBC-" + mac + "-" + strconv.Itoa(int(k))
-	if e, ok := c.lookup(key); ok && len(e.cats) > 0 {
+	var fpath string
+	if c.fileMode() {
+		var cs []Category
+		var ok bool
+		if fpath, cs, ok = c.fileCategories(mac, a, k); ok {
+			return page(cs, start, howMany), len(cs)
+		}
+	} else if e, ok := c.lookup(key); ok && len(e.cats) > 0 {
 		return page(e.cats, start, howMany), len(e.cats)
 	}
 	p := categoryPath[k]
@@ -372,7 +380,12 @@ func (c *Client) Categories(k Kind, a *config.AVR, mac string, start, howMany in
 		}
 	}
 	if len(all) > 0 {
-		c.store(key, cached{cats: all})
+		if c.fileMode() {
+			b, ok := encodeCategories(all)
+			c.saveFile(fpath, b, ok)
+		} else {
+			c.store(key, cached{cats: all})
+		}
 	}
 	return page(all, start, howMany), len(all)
 }
@@ -385,7 +398,14 @@ func (c *Client) Stations(k Kind, name string, a *config.AVR, mac string, start,
 		return c.DB.Stations(k, name, a, mac, start, howMany)
 	}
 	key := "RBS-" + mac + "-" + strconv.Itoa(int(k)) + "-" + hash(name)
-	if e, ok := c.lookup(key); ok && len(e.stations) > 0 {
+	var fpath string
+	if c.fileMode() {
+		var ss []Station
+		var ok bool
+		if fpath, ss, ok = c.fileStations(mac, a, k, name); ok {
+			return page(ss, start, howMany), len(ss)
+		}
+	} else if e, ok := c.lookup(key); ok && len(e.stations) > 0 {
 		return page(e.stations, start, howMany), len(e.stations)
 	}
 	sorting := "?order=" + url.QueryEscape(a.Order) + "&reverse=" + strconv.FormatBool(a.Reverse)
@@ -412,7 +432,12 @@ func (c *Client) Stations(k Kind, name string, a *config.AVR, mac string, start,
 		}
 	}
 	if len(all) > 0 {
-		c.store(key, cached{stations: all})
+		if c.fileMode() {
+			b, ok := encodeStations(all)
+			c.saveFile(fpath, b, ok)
+		} else {
+			c.store(key, cached{stations: all})
+		}
 	}
 	return page(all, start, howMany), len(all)
 }
@@ -526,7 +551,7 @@ func (c *Client) ByID(id12 string, a *config.AVR, mac string) (Station, bool) {
 	}
 	// A station already seen in one of this receiver's cached lists is served from
 	// there, as the Pascal build does, without another request.
-	if st, ok := c.fromLists(uuid, mac); ok {
+	if st, ok := c.fromLists(uuid, mac, a); ok {
 		return st, true
 	}
 	if e, ok := c.lookup("RBU-" + uuid); ok && len(e.stations) == 1 {
@@ -541,7 +566,10 @@ func (c *Client) ByID(id12 string, a *config.AVR, mac string) (Station, bool) {
 	return st, true
 }
 
-func (c *Client) fromLists(uuid, mac string) (Station, bool) {
+func (c *Client) fromLists(uuid, mac string, a *config.AVR) (Station, bool) {
+	if c.fileMode() {
+		return c.fromListFiles(uuid, mac, a)
+	}
 	if !c.caching() {
 		return Station{}, false
 	}
