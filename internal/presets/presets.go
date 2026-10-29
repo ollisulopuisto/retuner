@@ -106,7 +106,12 @@ func (p *Presets) fetch(code string) bool {
 	}
 	data, _ := io.ReadAll(io.LimitReader(resp.Body, maxBytes+1))
 	if len(data) > maxBytes {
-		data = data[:maxBytes] // the Pascal client stops receiving at the cap
+		// DELIBERATE DIVERGENCE: the Pascal client terminates the transfer at the cap;
+		// what it then does with the truncated prefix was not verified. A list cut
+		// off mid-way must not look complete, so an oversized answer is rejected
+		// outright and the cached copy stays.
+		log.Printf("Presets: %s is larger than %d bytes; refusing it", url, maxBytes)
+		return false
 	}
 	if len(data) == 0 {
 		log.Printf("Presets: %s returned nothing", url)

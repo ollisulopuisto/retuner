@@ -19,6 +19,7 @@ const clientTTL = 24 * time.Hour
 type Server struct {
 	Patterns           []string
 	Upstream           []string
+	UpstreamPort       string // "53"; tests point it elsewhere
 	AdvertiseIP        string // empty: the address the query arrived on
 	RestrictForwarding bool
 	AllowedClients     []string
@@ -31,7 +32,7 @@ type Server struct {
 func New(intercept, upstream, advertise string, restrict bool, allowed string) *Server {
 	return &Server{
 		Patterns: splitList(intercept), Upstream: splitList(upstream), AdvertiseIP: strings.TrimSpace(advertise),
-		RestrictForwarding: restrict, AllowedClients: splitList(allowed), known: map[string]time.Time{},
+		UpstreamPort: "53", RestrictForwarding: restrict, AllowedClients: splitList(allowed), known: map[string]time.Time{},
 	}
 }
 
@@ -159,7 +160,7 @@ func (s *Server) Handle(w mdns.ResponseWriter, req *mdns.Msg) {
 	}
 	c := &mdns.Client{Timeout: 3 * time.Second}
 	for _, up := range s.Upstream {
-		r, _, err := c.Exchange(req, net.JoinHostPort(up, "53"))
+		r, _, err := c.Exchange(req, net.JoinHostPort(up, s.UpstreamPort))
 		if err == nil && r != nil {
 			_ = w.WriteMsg(r)
 			return
@@ -173,9 +174,9 @@ func (s *Server) Handle(w mdns.ResponseWriter, req *mdns.Msg) {
 	_ = w.WriteMsg(m)
 }
 
-// Start listens on UDP (and TCP, which Indy's server did not offer; harmless
-// and needed for large answers from upstream). It returns once listening failed
-// or the server stopped.
+// Start listens on UDP only, like the Pascal build (Indy's server offered no TCP
+// here, so a truncated-answer retry over TCP is not supported). It returns once
+// listening failed or the server stopped.
 func (s *Server) Start(ip string, port int) error {
 	addr := net.JoinHostPort(ip, itoa(port))
 	srv := &mdns.Server{Addr: addr, Net: "udp", Handler: mdns.HandlerFunc(s.Handle)}
