@@ -34,6 +34,7 @@ import (
 	"retuner/internal/radiobrowser"
 	"retuner/internal/relay"
 	"retuner/internal/stations"
+	"retuner/internal/translator"
 	"retuner/internal/vtuner"
 )
 
@@ -681,7 +682,7 @@ func redirectCode(c *config.Config) int {
 func (s *Server) bookmarkList(w http.ResponseWriter, r *http.Request) {
 	mac := r.URL.Query().Get("mac")
 	first, last := pageRange(r.URL.Query(), s.bm.Count(mac))
-	body, ok := s.bm.Page(mac, first, last)
+	body, ok := s.bm.Page(mac, first, last, s.nameFn(r))
 	if !ok {
 		s.respond(w, http.StatusNotFound, "application/xml", nil)
 		return
@@ -727,4 +728,20 @@ func (s *Server) RelayResolve(id string) string {
 		}
 	}
 	return ""
+}
+
+// nameFn is the bookmark listing's ReplaceDiacritics step for the receiver in
+// the request, or nil when none of its three flags is set.
+func (s *Server) nameFn(r *http.Request) func(string) string {
+	a, _ := s.avrFor(r)
+	if a == nil {
+		return nil
+	}
+	t := a.Translator
+	if !(t.ReplaceLatin1Supplement || t.ReplaceExtA || t.ReplaceExtB) {
+		return nil
+	}
+	return func(n string) string {
+		return translator.ReplaceDiacritics(n, t.ReplaceLatin1Supplement, t.ReplaceExtA, t.ReplaceExtB)
+	}
 }

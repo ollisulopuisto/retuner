@@ -147,7 +147,7 @@ func (s *Store) Count(mac string) int {
 
 // Page renders items first..last (zero-based, inclusive). ok is false when
 // there is no file or it cannot be read - the handler answers 404 then.
-func (s *Store) Page(mac string, first, last int) ([]byte, bool) {
+func (s *Store) Page(mac string, first, last int, nameFn func(string) string) ([]byte, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	f, exists, err := s.read(mac)
@@ -161,6 +161,9 @@ func (s *Store) Page(mac string, first, last int) ([]byte, bool) {
 		}
 		it := f.Items[i]
 		it.Logo, it.Bookmark = s.subst(it.Logo), s.subst(it.Bookmark)
+		if nameFn != nil && it.Name != "" {
+			it.Name = nameFn(it.Name)
+		}
 		out = append(out, it)
 	}
 	// ItemCount in the page is the file's count, as in Pascal (child 0 is imported whole).
