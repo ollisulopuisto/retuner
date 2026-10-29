@@ -30,6 +30,7 @@ import (
 	"retuner/internal/config"
 	"retuner/internal/dnsserver"
 	"retuner/internal/playlist"
+	"retuner/internal/podcasts"
 	"retuner/internal/radiobrowser"
 	"retuner/internal/relay"
 	"retuner/internal/stations"
@@ -62,6 +63,7 @@ type Server struct {
 	avrs      map[string]*config.AVR
 
 	resolver  *playlist.Resolver
+	pod       *podcasts.Store
 	iconOnce  sync.Once
 	iconBytes []byte
 }
@@ -73,6 +75,14 @@ func New(cfg *config.Config, avr *config.AVR, urlHost string, store *stations.St
 	}
 	s := &Server{resolver: &playlist.Resolver{UserAgent: "Retuner/" + config.AppVersion}, cfg: cfg, avr: avr, urlHost: urlHost, token: cfg.Str("Configuration", "MyToken"), iconSize: size,
 		placehold: true, bookmarks: cfg.Bool("Bookmark", "Enable"), bm: bm, dns: dns, rb: rb, avrs: map[string]*config.AVR{}, commonAVR: cfg.Int("Configuration", "CommonAVRini", 1) != 0, localCtry: strings.TrimSpace(cfg.Str("Configuration", "LocalCountry")), store: store, mystOn: cfg.Bool("MyStations", "Enable")}
+	s.pod = &podcasts.Store{File: filepath.Join(cfg.ConfigDir(), cfg.Str("Podcasts", "PodcastsFile")), UserAgent: "Retuner/" + config.AppVersion,
+		Limit: cfg.Int("Podcasts", "PodcastEpisodesLimit", 100), TTL: time.Duration(cfg.Int("Podcasts", "PodcastCacheTTL", 60)) * time.Minute}
+	if s.pod.Limit < 1 {
+		s.pod.Limit = 100
+	}
+	if cfg.Bool("Podcasts", "Enable") {
+		s.pod.Load()
+	}
 	if s.token == "" {
 		s.token = "0123456789ABCDEF"
 	}
@@ -142,6 +152,9 @@ func (s *Server) Handler() http.Handler {
 				case "/" + root + "/bookmark":
 					s.bookmarkList(w, r)
 					return
+				case "/" + root + "/podcasts":
+					s.podcastFeeds(w, r)
+					return
 				case "/" + root + "/play":
 					s.play(w, r)
 					return
@@ -166,6 +179,10 @@ func (s *Server) Handler() http.Handler {
 						s.rbCategory(w, r, httpDecode(parts[0]), parts[1], true)
 						return
 					}
+				}
+				if pre := "/" + root + "/podcasts/"; strings.HasPrefix(lp, pre) && len(lp) > len(pre) && !strings.Contains(lp[len(pre):], "/") {
+					s.podcastEpisodes(w, r, httpDecode(r.URL.EscapedPath()[len(pre):]))
+					return
 				}
 				if pre := "/" + root + "/mystations/"; strings.HasPrefix(lp, pre) && len(lp) > len(pre) && !strings.Contains(lp[len(pre):], "/") {
 					esc := r.URL.EscapedPath()
@@ -213,8 +230,11 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 			}
 		case "about":
 			p.Add(s.dir(mi.Label, pathRoot+"/about", 2))
+		case "podcasts":
+			if n := len(s.pod.Feeds()); s.podOn() && n > 0 {
+				p.Add(s.dir(mi.Label, pathRoot+"/podcasts", n))
+			}
 		}
-		// podcasts: added in a later stage.
 	}
 	// Pascal order follows the avr.ini list; about comes first by default.
 	p.TotalItemsCount = len(p.Items)
@@ -230,6 +250,14 @@ func (s *Server) station(w http.ResponseWriter, r *http.Request) {
 		if cat, st, ok := s.store.ByID(id); ok {
 			p := &vtuner.Page{TotalItemsCount: 1}
 			p.Add(s.vtunerStation(cat, st, r))
+			s.page(w, p)
+			return
+		}
+	}
+	if len(id) >= 3 && id[:2] == podcasts.Prefix {
+		if e, ok := s.pod.EpisodeByID(id); ok {
+			p := &vtuner.Page{TotalItemsCount: 1}
+			p.Add(s.podStation(e, e.Description, r))
 			s.page(w, p)
 			return
 		}
@@ -313,6 +341,8 @@ func (s *Server) icon(w http.ResponseWriter, r *http.Request) {
 		if _, st, ok := s.store.ByID(id); ok {
 			logoURL = st.Logo
 		}
+	case strings.HasPrefix(id, podcasts.Prefix):
+		logoURL = s.pod.LogoForEpisode(id)
 	case strings.HasPrefix(id, "RB_"):
 		if st, ok := s.rbByID(id, r); ok {
 			logoURL = st.Icon
@@ -618,6 +648,11 @@ func (s *Server) play(w http.ResponseWriter, r *http.Request) {
 			target = s.stripHTTPS(st.URL, r)
 		}
 	}
+	if len(id) >= 2 && id[:2] == podcasts.Prefix {
+		if e, ok := s.pod.EpisodeByID(id); ok {
+			target = s.stripHTTPS(e.URL, r)
+		}
+	}
 	if strings.HasPrefix(id, "RB_") {
 		if st, ok := s.rbByID(id, r); ok {
 			target = s.stripHTTPS(st.URL, r)
@@ -681,6 +716,10 @@ func (s *Server) RelayResolve(id string) string {
 	case strings.HasPrefix(id, stations.Prefix+"_"):
 		if _, st, ok := s.store.ByID(id); ok {
 			return st.URL
+		}
+	case strings.HasPrefix(id, podcasts.Prefix+"_"):
+		if e, ok := s.pod.EpisodeByID(id); ok {
+			return e.URL
 		}
 	case strings.HasPrefix(id, "RB_") && s.rb != nil && len(id) >= 15:
 		if st, ok := s.rb.ByID(id[3:15], s.avr, ""); ok {
