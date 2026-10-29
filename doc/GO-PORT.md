@@ -59,3 +59,12 @@ like the Pascal release for the same requests.
   for a body otherwise.
 * `AppVersion` is pinned to the Pascal build under comparison (26.08.28.4) so
   bodies that embed it match. Versioning of the Go binary is an open decision.
+
+## Coordination
+
+This repository has no AGENTS.md, CODEX.md, board, roadmap, TODO or bugs file (checked on master b6d15c8); `CLAUDE.md` is guidance only. Until one exists, this file is the record for the Go port.
+
+- Claim: the Go port, branch `go-port-parity`, draft PR #49. No other open PR touches Go code (PR #49 was the only open PR when checked). Shared files touched outside the port: `script/retuner-update.sh` (a `-p "$PORT"` fix); no workflow files.
+- Merges are human only. Not released, not a drop-in.
+- Open work, in order: Go build/release packaging for the updater layout, then the gaps in the table above (real receivers, real Radio Browser data, TLS relay upstream, real podcast feeds, podcast icon/favourite/relay checks, online translation unsupported by choice).
+- Blockers: none at the time of writing.
