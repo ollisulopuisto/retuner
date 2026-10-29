@@ -70,7 +70,7 @@ INI
   pid=$!
   i=0
   while [ "$i" -lt 60 ]; do
-    if curl -fsS --noproxy '*' -o /dev/null \
+    if curl -fsS --noproxy '*' --max-time 15 -o /dev/null \
          "http://127.0.0.1:$PORT/setupapp/x/loginxml.asp?token=0" 2>/dev/null; then
       break
     fi
@@ -80,14 +80,14 @@ INI
 
   i=0
   while [ "$i" -lt "$pairs" ]; do
-    curl -s --noproxy '*' -o /dev/null "http://127.0.0.1:$PORT/retuner/mystations?mac=aabbccddee"
-    curl -s --noproxy '*' -o /dev/null "http://127.0.0.1:$PORT/retuner/mystations/Test?mac=aabbccddee"
+    curl -s --noproxy '*' --max-time 15 -o /dev/null "http://127.0.0.1:$PORT/retuner/mystations?mac=aabbccddee"
+    curl -s --noproxy '*' --max-time 15 -o /dev/null "http://127.0.0.1:$PORT/retuner/mystations/Test?mac=aabbccddee"
     i=$((i + 1))
   done
 
   # heaptrc only reports on a clean exit, so the process is asked to stop
   # rather than killed.
-  curl -s --noproxy '*' -o /dev/null "http://127.0.0.1:$MPORT/retuner/down" || true
+  curl -s --noproxy '*' --max-time 15 -o /dev/null "http://127.0.0.1:$MPORT/retuner/down" || true
   i=0
   while [ "$i" -lt 100 ]; do
     kill -0 "$pid" 2>/dev/null || break

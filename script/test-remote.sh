@@ -80,7 +80,7 @@ start_denon() {
   DENON_PID=$!
   i=0
   while [ "$i" -lt 50 ]; do
-    if curl -fsS --noproxy '*' -o /dev/null \
+    if curl -fsS --noproxy '*' --max-time 15 -o /dev/null \
       "http://127.0.0.1:$DENON_PORT/goform/formNetAudio_StatusXml.xml" 2>/dev/null; then
       return 0
     fi
@@ -130,7 +130,7 @@ start_server() {
   PID=$!
   i=0
   while [ "$i" -lt 50 ]; do
-    if curl -fsS --noproxy '*' -u "admin:$PASSWORD" -o /dev/null \
+    if curl -fsS --noproxy '*' --max-time 15 -u "admin:$PASSWORD" -o /dev/null \
       "http://127.0.0.1:$GUI_PORT/api/status" 2>/dev/null; then
       return 0
     fi
@@ -148,10 +148,10 @@ stop_server() {
   fi
 }
 
-gui()      { curl -fsS --noproxy '*' -u "admin:$PASSWORD" "$@" 2>/dev/null || true; }
-gui_code() { curl -sS  --noproxy '*' -o /dev/null -w '%{http_code}' "$@" 2>/dev/null || true; }
+gui()      { curl -fsS --noproxy '*' --max-time 15 -u "admin:$PASSWORD" "$@" 2>/dev/null || true; }
+gui_code() { curl -sS --noproxy '*' --max-time 15 -o /dev/null -w '%{http_code}' "$@" 2>/dev/null || true; }
 post()     {
-  curl -sS --noproxy '*' -u "admin:$PASSWORD" -H 'Content-Type: application/json' \
+  curl -sS --noproxy '*' --max-time 15 -u "admin:$PASSWORD" -H 'Content-Type: application/json' \
     -X POST --data "$2" "http://127.0.0.1:$GUI_PORT$1" 2>/dev/null || true
 }
 

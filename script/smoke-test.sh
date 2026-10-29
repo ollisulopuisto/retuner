@@ -24,6 +24,11 @@ PID=""
 cleanup() {
   if [ -n "$PID" ]; then
     kill "$PID" 2>/dev/null || true
+    # A server that ignores SIGTERM must not make `wait` hang the job: give it
+    # two seconds, then SIGKILL.
+    n=0
+    while kill -0 "$PID" 2>/dev/null && [ "$n" -lt 20 ]; do sleep 0.1; n=$((n + 1)); done
+    kill -9 "$PID" 2>/dev/null || true
     wait "$PID" 2>/dev/null || true
   fi
   rm -rf "$WORK"
@@ -62,7 +67,7 @@ PID=$!
 ready=""
 i=0
 while [ "$i" -lt 50 ]; do
-  if curl -fsS --noproxy '*' -o /dev/null \
+  if curl -fsS --noproxy '*' --max-time 5 -o /dev/null \
        "http://127.0.0.1:$PORT/setupapp/x/loginxml.asp?token=0" 2>/dev/null; then
     ready=1; break
   fi
@@ -75,7 +80,7 @@ done
 fail=0
 check() {
   name=$1; url=$2; expect=$3
-  body=$(curl -fsS --noproxy '*' "http://127.0.0.1:$PORT$url" 2>/dev/null || true)
+  body=$(curl -fsS --noproxy '*' --max-time 15 "http://127.0.0.1:$PORT$url" 2>/dev/null || true)
   if printf '%s' "$body" | grep -q "$expect"; then
     echo "  ok   $name"
   else
@@ -170,7 +175,7 @@ fi
 echo "A station with no logo still gets an image"
 icon_check() { # $1 = what it is, $2 = curl args
   # shellcheck disable=SC2086  # $2 is a deliberate argument list
-  out=$(curl -s --noproxy '*' -o /dev/null -D - $2 \
+  out=$(curl -s --noproxy '*' --max-time 15 -o /dev/null -D - $2 \
     "http://127.0.0.1:$PORT/retuner/icon?id=MS_AAAAAAAAAAAA" 2>/dev/null || true)
   code=$(printf '%s' "$out" | sed -n 's|^HTTP/[0-9.]* \([0-9]*\).*|\1|p' | tail -1)
   ctype=$(printf '%s' "$out" | tr -d '\r' | sed -n 's/^[Cc]ontent-[Tt]ype: *//p' | tail -1)

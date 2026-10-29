@@ -61,7 +61,7 @@ start_site() { # $1 = port, $2 = "nofavicon" or empty
   SITE_PID=$!
   i=0
   while [ "$i" -lt 50 ]; do
-    if curl -fsS --noproxy '*' -o /dev/null "http://127.0.0.1:$1/plain/" 2>/dev/null; then
+    if curl -fsS --noproxy '*' --max-time 15 -o /dev/null "http://127.0.0.1:$1/plain/" 2>/dev/null; then
       return 0
     fi
     kill -0 "$SITE_PID" 2>/dev/null || { echo "error: mock site died" >&2; exit 1; }
