@@ -192,7 +192,11 @@ func (s *Store) StationInfo(mac, id string) (body []byte, ok bool) {
 func (s *Store) Set(mac, action string, it Item) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	f, exists, err := s.read(mac)
+	safeMac := mac
+	if s.Common || !safeMAC.MatchString(safeMac) {
+		safeMac = "bookmark"
+	}
+	f, exists, err := s.read(safeMac)
 	if err != nil {
 		return
 	}
@@ -209,7 +213,7 @@ func (s *Store) Set(mac, action string, it Item) {
 			break
 		}
 	}
-	p := s.path(mac)
+	p := s.path(safeMac)
 	// A file created from scratch keeps <X></X> for empty values; once it has
 	// been read back and rewritten, the Pascal DOM writer emits <X/> for every
 	// empty element, old entries included. Match both so files stay identical.
