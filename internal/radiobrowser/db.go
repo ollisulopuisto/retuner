@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"regexp"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -297,6 +298,8 @@ func (b *DB) execWithJSON(d *sql.DB, steps, path string) error {
 		}
 	}
 	return nil
+var safeViewName = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
+
 func viewName(a *config.AVR) string {
 	return "avr_" + strconv.FormatUint(uint64(a.FileCRC), 10)
 var safeSQLIdent = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
@@ -328,6 +331,9 @@ func deleteSection(lines []string, marker string) []string {
 		if end < len(lines) {
 			end++
 	name := viewName(a)
+	if !safeViewName.MatchString(name) {
+		return "", fmt.Errorf("invalid view name")
+	}
 		lines = append(lines[:start], lines[end:]...)
 	}
 }
