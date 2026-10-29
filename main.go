@@ -192,6 +192,7 @@ func main() {
 			log.Printf("Maintenance Service: error (%v)", err)
 		}
 	}
+	server.WarnTranslate(avr, "avr.ini")
 	srv := server.New(cfg, avr, urlHost, store, bm, dnsSrv, rb)
 	if cfg.Bool("Configuration", "RelayHTTPS") {
 		rl := &relay.Server{Resolve: srv.RelayResolve, Playlists: cfg.Bool("Configuration", "ResolvePlaylists"),

@@ -41,6 +41,7 @@ func (s *Server) avrFor(r *http.Request) (*config.AVR, string) {
 		return s.avr, ""
 	}
 	s.avrs[mac] = a
+	WarnTranslate(a, mac)
 	return a, mac
 }
 
@@ -244,4 +245,12 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request) {
 	start, howMany := s.rbRange(r)
 	sts, total := s.rb.Stations(radiobrowser.Search, text, a, mac, start, howMany)
 	s.rbStations(w, r, sts, total, "")
+}
+
+// WarnTranslate: the online translation is not ported; say so instead of
+// silently ignoring [Translator] Enable=1 (and never call the network).
+func WarnTranslate(a *config.AVR, who string) {
+	if a != nil && a.Translator.Enabled {
+		log.Printf("WARNING: [Translator] Enable=1 (%s): online translation is not supported by the Go build and is ignored; only the Replace* options apply", who)
+	}
 }
