@@ -3,16 +3,19 @@ package main
 
 import (
 	"flag"
+	"hash/crc32"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"path/filepath"
 	"retuner/internal/bookmark"
 	"retuner/internal/config"
 	"retuner/internal/dnsserver"
+	"retuner/internal/presets"
 	"retuner/internal/server"
 	"retuner/internal/stations"
 )
@@ -40,6 +43,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("config: %v", err)
 	}
+	_ = os.MkdirAll(cfg.CacheDir(), 0o755)
+	_ = os.MkdirAll(cfg.ConfigDir(), 0o755)
+	if moved := cfg.MoveConfigFiles(); len(moved) > 0 {
+		log.Printf("Moving files to config directory ..")
+	}
 	avr, err := cfg.LoadAVR()
 	if err != nil {
 		log.Fatalf("avr.ini: %v", err)
@@ -50,10 +58,53 @@ func main() {
 		urlHost = my
 	}
 
-	store := &stations.Store{Own: filepath.Join(cfg.ConfigDir(), cfg.Str("MyStations", "MyStationsFile"))}
+	pre := &presets.Presets{Enabled: cfg.Bool("Presets", "Enable"), URL: cfg.Str("Presets", "PresetsURL"),
+		Countries: cfg.Str("Presets", "PresetsCountries"), Dir: filepath.Join(cfg.ConfigDir(), "presets")}
+	if pre.Countries == "default" {
+		pre.Countries = ""
+	}
+	if pre.URL == "" {
+		pre.URL = presets.DefaultURL
+	}
+	store := &stations.Store{Own: filepath.Join(cfg.ConfigDir(), cfg.Str("MyStations", "MyStationsFile")), Files: pre.CachedFiles}
+	reload := func() {
+		own, pc := store.Reload()
+		if own+pc == 0 {
+			log.Printf("My stations: no stations loaded")
+		} else if pc > 0 {
+			log.Printf("My stations: successfully loaded %d my stations (%d from presets)", own+pc, pc)
+		} else {
+			log.Printf("My stations: successfully loaded %d my stations", own)
+		}
+	}
+	// Before the first station load, so a fresh install serves presets in its
+	// very first menu; synchronous on purpose (nothing is serving yet).
+	if pre.Enabled {
+		pre.Refresh()
+	}
 	if cfg.Bool("MyStations", "Enable") {
-		own, pre := store.Reload()
-		log.Printf("My stations: loaded %d (%d from presets)", own+pre, pre)
+		reload()
+		// Auto refresh: re-read the own file only when its content changed.
+		if mins := cfg.Int("MyStations", "MyStationsAutoRefreshPeriod", 0); mins > 0 {
+			go func() {
+				last := fileSum(store.Own)
+				for range time.Tick(time.Duration(mins) * time.Minute) {
+					if sum := fileSum(store.Own); sum != last {
+						log.Printf("\"My Stations\" file has been changed. Refreshing..")
+						reload()
+						last = sum
+					}
+				}
+			}()
+		}
+		if mins := cfg.Int("Presets", "PresetsAutoRefreshPeriod", 0); pre.Enabled && mins > 0 {
+			go func() {
+				for range time.Tick(time.Duration(mins) * time.Minute) {
+					pre.Refresh()
+					reload()
+				}
+			}()
+		}
 	}
 
 	lim := cfg.Int("Bookmark", "BookmarkStationsLimit", 100)
@@ -90,4 +141,12 @@ func main() {
 		log.Printf("web service: %v", err)
 		os.Exit(1)
 	}
+}
+
+func fileSum(path string) uint32 {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return 0
+	}
+	return crc32.ChecksumIEEE(b)
 }

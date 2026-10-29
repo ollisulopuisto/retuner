@@ -31,10 +31,10 @@ like the Pascal release for the same requests.
 | ini defaults + avr.ini (common.pas, avr.pas)        | partial | smoke-test default-port checks pass; INIVersion upgrade/outdated-notice not ported |
 | login/about/empty/statxml routes, /ytuner/ legacy, Frontier deep path | done | smoke-test 14/14, parity-diff 16/16 |
 | icon placeholder (httpserver.pas)                   | partial | placeholder only; station logo fetch/scale/cache not ported |
-| my stations (my_stations.pas)                       | partial | ini+yaml parse, merge, paging, play redirect, id lookup; parity-diff 28 same. Not ported: preset files in the merge, auto-refresh, relay URLs, ResolvePlaylists, logo fetch |
+| my stations (my_stations.pas)                       | partial | ini+yaml parse, merge incl. preset files, own-file auto refresh by content CRC, config-dir migration, paging, play redirect, id lookup; parity-diff 28 same. Not ported: relay URLs, ResolvePlaylists, logo fetch |
 | bookmarks (bookmark.pas)                            | partial | add/del/list/lookup, same file format incl. mixed <X/> vs <X></X>; 24-step stateful sequence identical to Pascal incl. file bytes. Not ported: per-MAC avr.ini translator, non-common MAC files only lightly tested. Deliberate divergence: MAC is sanitised before use as a file name |
 | radio-browser + db (radiobrowser*.pas)              | todo    | test-radiobrowser.sh |
-| presets (presets.pas)                               | todo    | test-presets.sh |
+| presets (presets.pas)                               | done*   | test-presets.sh 15/15 (Pascal also 15/15), unit tests. *Oversize download cap behaviour (Pascal terminates the transfer) only assumed |
 | podcasts (podcasts.pas)                             | todo    | |
 | DNS server (dnsserver.pas)                          | partial | miekg/dns. fuzz-test.sh DNS phase passes (malformed packets, intercept list 14/14, control name); dns-parity.sh: raw replies identical for 8 cases (A, AAAA, MX, case, apex, not intercepted without upstream). Not verified: forwarding to a real upstream, RestrictForwarding/AllowedClients on the wire, TCP. Later fuzz-test phases (radio-browser, icons) fail until those are ported |
 | web GUI / remote / relay / maintenance / updater    | todo    | test-webgui.sh, test-remote.sh, test-update.sh |

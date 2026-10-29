@@ -93,13 +93,50 @@ func (c *Config) Int(sec, key string, def int) int {
 
 func (c *Config) Bool(sec, key string) bool { return c.Int(sec, key, 0) != 0 }
 
-// ConfigDir resolves ConfigFolderLocation ("default" means ./config beside the ini).
-func (c *Config) ConfigDir() string {
-	v := c.Str("Configuration", "ConfigFolderLocation")
+// folder resolves a *FolderLocation key: "default" means beside the ini, and a
+// custom location always gets the sub-folder name appended (<loc>/config), as in
+// retuner.pas.
+func (c *Config) folder(key, sub string) string {
+	v := c.Str("Configuration", key)
 	if v == "" || v == "default" {
-		return filepath.Join(c.Dir, "config")
+		return filepath.Join(c.Dir, sub)
 	}
-	return v
+	return filepath.Join(v, sub)
+}
+
+func (c *Config) ConfigDir() string { return c.folder("ConfigFolderLocation", "config") }
+func (c *Config) CacheDir() string  { return c.folder("CacheFolderLocation", "cache") }
+
+// MoveConfigFiles moves stations files and *.xml (bookmarks) that sit beside the
+// ini into the config folder, as older installs kept them there (MoveConfigFiles
+// in retuner.pas). Existing files in config are overwritten.
+func (c *Config) MoveConfigFiles() []string {
+	dst := c.ConfigDir()
+	var moved []string
+	own := c.Str("MyStations", "MyStationsFile")
+	entries, err := os.ReadDir(c.Dir)
+	if err != nil || filepath.Clean(dst) == filepath.Clean(c.Dir) {
+		return nil
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		n := e.Name()
+		ln := strings.ToLower(n)
+		if n == own || strings.HasPrefix(ln, "stations.") || strings.HasSuffix(ln, ".xml") {
+			from := filepath.Join(c.Dir, n)
+			data, err := os.ReadFile(from)
+			if err != nil {
+				continue
+			}
+			if os.WriteFile(filepath.Join(dst, n), data, 0o644) == nil {
+				_ = os.Remove(from)
+				moved = append(moved, n)
+			}
+		}
+	}
+	return moved
 }
 
 // ---- avr.ini ----
