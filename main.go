@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"path/filepath"
+	"retuner/internal/bookmark"
 	"retuner/internal/config"
 	"retuner/internal/server"
 	"retuner/internal/stations"
@@ -54,6 +55,9 @@ func main() {
 		log.Printf("My stations: loaded %d (%d from presets)", own+pre, pre)
 	}
 
+	lim := cfg.Int("Bookmark", "BookmarkStationsLimit", 100)
+	bm := &bookmark.Store{Dir: cfg.ConfigDir(), Common: cfg.Bool("Bookmark", "CommonBookmark"), Limit: lim, URLHost: urlHost}
+
 	wp := cfg.Int("WebServer", "WebServerPort", 80)
 	if *port != 0 {
 		wp = *port
@@ -64,7 +68,7 @@ func main() {
 	}
 	addr := net.JoinHostPort(bind, strconv.Itoa(wp))
 	log.Printf("Web Service: listening on: %s", addr)
-	if err := http.ListenAndServe(addr, server.New(cfg, avr, urlHost, store).Handler()); err != nil {
+	if err := http.ListenAndServe(addr, server.New(cfg, avr, urlHost, store, bm).Handler()); err != nil {
 		log.Printf("web service: %v", err)
 		os.Exit(1)
 	}

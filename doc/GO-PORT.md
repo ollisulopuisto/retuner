@@ -31,8 +31,8 @@ like the Pascal release for the same requests.
 | ini defaults + avr.ini (common.pas, avr.pas)        | partial | smoke-test default-port checks pass; INIVersion upgrade/outdated-notice not ported |
 | login/about/empty/statxml routes, /ytuner/ legacy, Frontier deep path | done | smoke-test 14/14, parity-diff 16/16 |
 | icon placeholder (httpserver.pas)                   | partial | placeholder only; station logo fetch/scale/cache not ported |
-| my stations (my_stations.pas)                       | todo    | |
-| bookmarks (bookmark.pas)                            | todo    | |
+| my stations (my_stations.pas)                       | partial | ini+yaml parse, merge, paging, play redirect, id lookup; parity-diff 28 same. Not ported: preset files in the merge, auto-refresh, relay URLs, ResolvePlaylists, logo fetch |
+| bookmarks (bookmark.pas)                            | partial | add/del/list/lookup, same file format incl. mixed <X/> vs <X></X>; 24-step stateful sequence identical to Pascal incl. file bytes. Not ported: per-MAC avr.ini translator, non-common MAC files only lightly tested. Deliberate divergence: MAC is sanitised before use as a file name |
 | radio-browser + db (radiobrowser*.pas)              | todo    | test-radiobrowser.sh |
 | presets (presets.pas)                               | todo    | test-presets.sh |
 | podcasts (podcasts.pas)                             | todo    | |

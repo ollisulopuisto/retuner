@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 
+	"retuner/internal/bookmark"
 	"retuner/internal/config"
 	"retuner/internal/stations"
 	"retuner/internal/vtuner"
@@ -39,18 +40,19 @@ type Server struct {
 	bookmarks bool
 	store     *stations.Store
 	mystOn    bool
+	bm        *bookmark.Store
 
 	iconOnce  sync.Once
 	iconBytes []byte
 }
 
-func New(cfg *config.Config, avr *config.AVR, urlHost string, store *stations.Store) *Server {
+func New(cfg *config.Config, avr *config.AVR, urlHost string, store *stations.Store, bm *bookmark.Store) *Server {
 	size := cfg.Int("Configuration", "IconSize", 200)
 	if size <= 0 {
 		size = 200
 	}
 	s := &Server{cfg: cfg, avr: avr, urlHost: urlHost, token: cfg.Str("Configuration", "MyToken"), iconSize: size,
-		placehold: true, bookmarks: cfg.Bool("Bookmark", "Enable"), store: store, mystOn: cfg.Bool("MyStations", "Enable")}
+		placehold: true, bookmarks: cfg.Bool("Bookmark", "Enable"), bm: bm, store: store, mystOn: cfg.Bool("MyStations", "Enable")}
 	if s.token == "" {
 		s.token = "0123456789ABCDEF"
 	}
@@ -95,7 +97,7 @@ func (s *Server) Handler() http.Handler {
 		case strings.HasPrefix(lp, "/setupapp/") && strings.HasSuffix(lp, "/statxml.asp") && lp != "/setupapp/statxml.asp":
 			s.station(w, r)
 		case lp == "/setupapp/favxml.asp":
-			s.display(w, msgNoStations) // bookmark service: station lookup lands in a later stage
+			s.favorite(w, r)
 		default:
 			for _, root := range []string{pathRoot, pathRootLegacy} {
 				switch lp {
@@ -110,6 +112,9 @@ func (s *Server) Handler() http.Handler {
 					return
 				case "/" + root + "/mystations":
 					s.myStations(w, r)
+					return
+				case "/" + root + "/bookmark":
+					s.bookmarkList(w, r)
 					return
 				case "/" + root + "/play":
 					s.play(w, r)
@@ -141,7 +146,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 			}
 		case "bookmarks":
 			if s.bookmarks {
-				p.Add(s.dir(mi.Label, pathRoot+"/bookmark", 0))
+				p.Add(s.dir(mi.Label, pathRoot+"/bookmark", s.bm.Count(r.URL.Query().Get("mac"))))
 			}
 		case "about":
 			p.Add(s.dir(mi.Label, pathRoot+"/about", 2))
@@ -165,6 +170,15 @@ func (s *Server) station(w http.ResponseWriter, r *http.Request) {
 			s.page(w, p)
 			return
 		}
+	}
+	if len(id) >= 3 && id[2] == 'B' {
+		body, ok := s.bm.StationInfo(r.URL.Query().Get("mac"), id)
+		if !ok {
+			s.respond(w, http.StatusNotFound, "application/xml", nil)
+		} else {
+			s.respond(w, http.StatusOK, "application/xml", body)
+		}
+		return
 	}
 	s.display(w, msgNoStations)
 }
@@ -410,4 +424,36 @@ func redirectCode(c *config.Config) int {
 		return 302
 	}
 	return n
+}
+
+func (s *Server) bookmarkList(w http.ResponseWriter, r *http.Request) {
+	mac := r.URL.Query().Get("mac")
+	first, last := pageRange(r.URL.Query(), s.bm.Count(mac))
+	body, ok := s.bm.Page(mac, first, last)
+	if !ok {
+		s.respond(w, http.StatusNotFound, "application/xml", nil)
+		return
+	}
+	s.respond(w, http.StatusOK, "application/xml", body)
+}
+
+// favorite is the receiver's add/remove-favourite call. Only stations of the
+// user's own list resolve here so far; the Pascal handler answers "No
+// station(s) found" for an id it cannot look up, and otherwise answers an empty
+// 200 once the file is updated (it never writes a body for the call itself).
+func (s *Server) favorite(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	id := q.Get("id")
+	if len(id) >= 3 && id[:2] == stations.Prefix {
+		if cat, st, ok := s.store.ByID(id); ok {
+			vs := s.vtunerStation(cat, st, r)
+			it := bookmark.Item{ID: strings.Replace(vs.UID, "_", "B", 1), Name: vs.Name, URL: vs.URL, Desc: vs.Description,
+				Logo: vs.Icon, Format: vs.Genre, Location: vs.Location, Bandwidth: vs.Bitrate, Mime: "", Relia: "3", Bookmark: vs.Bookmark}
+			s.bm.Set(q.Get("mac"), q.Get("fav"), it)
+			w.Header().Set("Content-Type", "text/html")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+	}
+	s.display(w, msgNoStations)
 }

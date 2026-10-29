@@ -107,4 +107,60 @@ done <<'EOU'
 /
 /retuner/doesnotexist
 EOU
+# Ids are derived (md5 of name+url), so read them from the reference rather
+# than hard-coding, then ask both servers about each one.
+ids=$(curl -s --noproxy '*' "http://127.0.0.1:18201/retuner/mystations/Jazz%20%26%20Blues" | sed -n 's|.*<StationId>\(.*\)</StationId>.*|\1|p')
+for id in $ids; do
+  for u in "/setupapp/x/statxml.asp?id=$id" "/retuner/play?id=$id&mac=aa"; do
+    for n in ref new; do
+      port=18201; [ $n = new ] && port=18202
+      curl -s --noproxy '*' -o "$WORK/$n.body" -D "$WORK/$n.hdr" "http://127.0.0.1:$port$u" || true
+      { sed -n 1p "$WORK/$n.hdr" | tr -d '\r'; grep -i '^location' "$WORK/$n.hdr" | tr -d '\r'; cat "$WORK/$n.body"; } > "$WORK/$n.cmp"
+    done
+    if cmp -s "$WORK/ref.cmp" "$WORK/new.cmp"; then echo "  same  $u"; else echo "  DIFF  $u"; fail=1; fi
+  done
+done
+# Bookmarks are stateful, so they are compared as a sequence run against both
+# servers in the same order, each reply compared as it comes.
+set -- $ids
+id1=$1; id2=$2; id3=$3
+b1="MSB${id1#MS_}"
+echo "Bookmark sequence"
+while IFS= read -r u; do
+  [ -z "$u" ] && continue
+  u=$(printf '%s' "$u" | sed "s/@1/$id1/g; s/@2/$id2/g; s/@3/$id3/g; s/@B1/$b1/g")
+  for n in ref new; do
+    port=18201; [ $n = new ] && port=18202
+    curl -s --noproxy '*' -o "$WORK/$n.body" -D "$WORK/$n.hdr" "http://127.0.0.1:$port$u" || true
+    { sed -n 1p "$WORK/$n.hdr" | tr -d '\r'; grep -i '^content-type' "$WORK/$n.hdr" | tr -d '\r'; cat "$WORK/$n.body"; } > "$WORK/$n.cmp"
+    if [ -f "$WORK/$n/config/bookmark.xml" ]; then cat "$WORK/$n/config/bookmark.xml" >> "$WORK/$n.cmp"; else echo "[no bookmark file]" >> "$WORK/$n.cmp"; fi
+  done
+  if cmp -s "$WORK/ref.cmp" "$WORK/new.cmp"; then echo "  same  $u"; else echo "  DIFF  $u"; diff "$WORK/ref.cmp" "$WORK/new.cmp" | head -8; fail=1; fi
+done <<'EOB'
+/retuner/bookmark?mac=aabbccddee
+/setupapp/x/loginxml.asp?mac=aabbccddee
+/setupapp/x/statxml.asp?id=@B1&mac=aabbccddee
+/setupapp/favxml.asp?id=@1&fav=del&mac=aabbccddee
+/setupapp/favxml.asp?id=@1&fav=add&mac=aabbccddee
+/setupapp/favxml.asp?id=@1&fav=add&mac=aabbccddee
+/setupapp/favxml.asp?id=@2&fav=add&mac=aabbccddee
+/setupapp/favxml.asp?id=@3&fav=add&mac=other
+/setupapp/favxml.asp?id=MS_NOTREAL&fav=add&mac=aabbccddee
+/setupapp/favxml.asp?id=&fav=add
+/setupapp/favxml.asp?id=@2&fav=bogus
+/retuner/bookmark?mac=aabbccddee
+/retuner/bookmark?mac=aabbccddee&start=2&howmany=1
+/retuner/bookmark?mac=aabbccddee&startitems=2&enditems=9
+/ytuner/bookmark
+/setupapp/x/loginxml.asp?mac=aabbccddee
+/setupapp/x/statxml.asp?id=@B1&mac=aabbccddee
+/setupapp/x/statxml.asp?id=MSBNOTTHERE&mac=aabbccddee
+/setupapp/favxml.asp?id=@1&fav=del&mac=aabbccddee
+/retuner/bookmark?mac=aabbccddee
+/setupapp/favxml.asp?id=@2&fav=del&mac=aabbccddee
+/setupapp/favxml.asp?id=@3&fav=del&mac=aabbccddee
+/retuner/bookmark?mac=aabbccddee
+/setupapp/x/statxml.asp?id=@B1&mac=aabbccddee
+/setupapp/favxml.asp?id=@2&fav=del&mac=aabbccddee
+EOB
 [ $fail -eq 0 ] && echo "All compared responses match." || { echo "Differences found."; exit 1; }
