@@ -18,6 +18,7 @@ import (
 	"retuner/internal/radiobrowser"
 	"retuner/internal/server"
 	"retuner/internal/stations"
+	"retuner/internal/webgui"
 )
 
 func localIP(v string) string {
@@ -138,6 +139,12 @@ func main() {
 				}
 			}()
 		}
+	}
+
+	if cfg.Bool("WebGUI", "Enable") {
+		(&webgui.Server{Allowed: cfg.Str("WebGUI", "WebGUIIPAddress"), User: cfg.Str("WebGUI", "WebGUIUser"), Password: cfg.Str("WebGUI", "WebGUIPassword"),
+			Store: store, FileName: cfg.Str("MyStations", "MyStationsFile"), AppName: config.AppName, Version: config.AppVersion,
+		}).Start(cfg.Str("WebGUI", "WebGUIIPAddress"), cfg.Int("WebGUI", "WebGUIPort", 8090))
 	}
 
 	lim := cfg.Int("Bookmark", "BookmarkStationsLimit", 100)

@@ -1,0 +1,82 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Retuner stations</title><style>
+:root{--bg:#f6f5f2;--card:#fff;--ink:#1c2530;--soft:#5b6875;--line:#dcd8d0;--accent:#0e7d86;--danger:#b3261e}
+@media(prefers-color-scheme:dark){:root{--bg:#151b21;--card:#1d252d;--ink:#e6ebef;--soft:#a3aeb8;--line:#2d3742;--accent:#3fc1cb;--danger:#ff8a80}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+.wrap{max-width:900px;margin:0 auto;padding:32px 20px 80px}
+h1{font-size:26px;margin:0 0 4px}.sub{color:var(--soft);margin:0 0 24px;font-size:14px}
+.cat{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:14px}
+.cathead{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+input{font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);width:100%}
+.catname{font-weight:600}
+table{width:100%;border-collapse:collapse}td{padding:3px 4px;vertical-align:top}
+th{text-align:left;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);padding:4px}
+button{font:inherit;padding:7px 14px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--accent)}
+.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.x{border:none;background:none;color:var(--danger);font-size:18px;line-height:1;padding:4px 8px}
+.bar{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:14px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.msg{font-size:14px;color:var(--soft)}.err{color:var(--danger)}
+.ro{background:#f9f0dd;border:1px solid #e0c98a;color:#6b4f14;padding:10px 14px;border-radius:6px;margin-bottom:18px;font-size:14px}
+@media(max-width:640px){
+.wrap{padding:20px 14px 80px}h1{font-size:22px}
+.cat{padding:12px}
+table,tbody,tr,td{display:block;width:100%}
+tr.hd{display:none}
+tr{border:1px solid var(--line);border-radius:6px;padding:10px;margin-bottom:10px;position:relative}
+td{padding:4px 0}
+td[data-l]::before{content:attr(data-l);display:block;font-size:11px;letter-spacing:.08em;
+text-transform:uppercase;color:var(--soft);margin-bottom:3px}
+td:last-child{position:absolute;top:6px;right:6px;width:auto;padding:0}
+}
+</style></head><body><div class="wrap">
+<h1>Retuner</h1>
+<p class="sub">My Stations &mdash; the list your receiver shows under that menu. Changes are written to your stations file when you press Save.</p>
+<p class="sub" id="status">Loading&hellip;</p>
+<div id="ro" class="ro" hidden>This station file is YAML. Editing here supports .ini files only, so saving is disabled.</div>
+<div id="cats"></div>
+<button id="addcat">+ Add category</button>
+<div class="bar"><button class="primary" id="save">Save</button>
+<button id="reload">Discard changes</button><span class="msg" id="msg"></span></div>
+</div><script>
+const H={"Content-Type":"application/json"};
+let data={categories:[]},readonly=false;
+const el=(t,a={})=>Object.assign(document.createElement(t),a);
+function draw(){const c=document.getElementById("cats");c.textContent="";
+ data.categories.forEach((cat,ci)=>{const d=el("div",{className:"cat"});
+  const h=el("div",{className:"cathead"});
+  const n=el("input",{value:cat.name,className:"catname"});n.oninput=e=>cat.name=e.target.value;
+  const rm=el("button",{className:"x",textContent:"\u00d7",title:"Remove category"});
+  rm.onclick=()=>{data.categories.splice(ci,1);draw()};
+  h.append(n,rm);d.append(h);
+  const t=el("table");const hr=el("tr",{className:"hd"});
+  ["Name","Stream URL","Logo URL (optional)",""].forEach(x=>hr.append(el("th",{textContent:x})));
+  t.append(hr);
+  cat.stations.forEach((s,si)=>{const r=el("tr");
+   [["name","Name"],["url","Stream URL"],["logo","Logo URL"]].forEach(([k,lab])=>{
+    const td=el("td");td.setAttribute("data-l",lab);
+    const i=el("input",{value:s[k]||""});i.oninput=e=>s[k]=e.target.value;td.append(i);r.append(td)});
+   const td=el("td");const b=el("button",{className:"x",textContent:"\u00d7",title:"Remove station"});
+   b.onclick=()=>{cat.stations.splice(si,1);draw()};td.append(b);r.append(td);t.append(r)});
+  d.append(t);
+  const add=el("button",{textContent:"+ Add station"});
+  add.onclick=()=>{cat.stations.push({name:"",url:"",logo:""});draw()};
+  d.append(add);c.append(d)})}
+async function load(){const r=await fetch("api/stations",{headers:H});const j=await r.json();
+ data={categories:j.categories||[]};readonly=!!j.readonly;
+ document.getElementById("ro").hidden=!readonly;
+ document.getElementById("save").disabled=readonly;
+ const s=await(await fetch("api/status",{headers:H})).json();
+ document.getElementById("status").textContent=
+  s.app+" "+s.version+" \u2014 "+s.stations+" stations in "+s.categories+" categories \u2014 "+s.file;
+ draw()}
+document.getElementById("addcat").onclick=()=>{data.categories.push({name:"New category",stations:[]});draw()};
+document.getElementById("reload").onclick=()=>{msg("");load()};
+function msg(t,bad){const m=document.getElementById("msg");m.textContent=t;m.className="msg"+(bad?" err":"")}
+document.getElementById("save").onclick=async()=>{msg("Saving\u2026");
+ const r=await fetch("api/stations",{method:"POST",headers:H,body:JSON.stringify(data)});
+ const j=await r.json();
+ if(j.error){msg(j.error,true)}else{msg("Saved.");load()}};
+load();
+</script></body></html>
