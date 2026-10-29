@@ -9,14 +9,22 @@ import (
 	"encoding/base64"
 	"image"
 	"image/draw"
+	_ "image/gif"
 	"image/jpeg"
 	"image/png"
+	"io"
+	"log"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"retuner/internal/bookmark"
 	"retuner/internal/config"
@@ -253,7 +261,15 @@ func (s *Server) about(w http.ResponseWriter, r *http.Request) {
 // icon answers with the placeholder mark. Real station logos arrive with the
 // station sources; this is the path a station without a logo takes. Both GET
 // and HEAD must carry type and length - receivers HEAD first and give up on 404.
-func (s *Server) icon(w http.ResponseWriter, r *http.Request) {
+const (
+	iconMaxBytes  = 4 * 1024 * 1024
+	iconMaxEdge   = 8192
+	iconMaxPixels = 16 * 1024 * 1024
+)
+
+var safeIconKey = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+
+func (s *Server) servePlaceholder(w http.ResponseWriter) {
 	b := s.placeholder()
 	if !s.placehold || len(b) == 0 {
 		s.respond(w, http.StatusNotFound, "text/html; charset=utf-8", nil)
@@ -265,6 +281,120 @@ func (s *Server) icon(w http.ResponseWriter, r *http.Request) {
 	// Pascal server closes after every response, so do the same here.
 	w.Header().Set("Connection", "close")
 	s.respond(w, http.StatusOK, "image/jpeg", b)
+}
+
+// icon serves a station logo: from the cache folder when cached, else fetched
+// from the station's logo URL (4 MB cap, redirects followed), decoded (JPEG,
+// PNG, GIF), shrunk to IconSize and sent as JPEG, then cached under the id.
+// Anything that fails ends in the placeholder (or 404 when that is off).
+func (s *Server) icon(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	if !safeIconKey.MatchString(id) {
+		log.Printf("Icon id refused, it is not an id")
+		s.respond(w, http.StatusNotFound, "", nil)
+		return
+	}
+	cacheOn := s.cfg.Int("Configuration", "IconCache", 1) != 0
+	cachePath := filepath.Join(s.cfg.CacheDir(), id)
+	if cacheOn {
+		if b, err := os.ReadFile(cachePath); err == nil && len(b) > 0 {
+			s.respond(w, http.StatusOK, "image/jpeg", b)
+			return
+		}
+	}
+	logoURL := ""
+	switch {
+	case strings.HasPrefix(id, stations.Prefix):
+		if _, st, ok := s.store.ByID(id); ok {
+			logoURL = st.Logo
+		}
+	case strings.HasPrefix(id, "RB_"):
+		if st, ok := s.rbByID(id, r); ok {
+			logoURL = st.Icon
+		}
+	}
+	if logoURL != "" {
+		if out, ok := s.fetchLogo(logoURL); ok {
+			if cacheOn {
+				_ = os.MkdirAll(s.cfg.CacheDir(), 0o755)
+				if err := os.WriteFile(cachePath, out, 0o644); err != nil {
+					log.Printf("%s file save error (%v)", id, err)
+				}
+			}
+			s.respond(w, http.StatusOK, "image/jpeg", out)
+			return
+		}
+		log.Printf("Cannot process image from %q", logoURL)
+	}
+	s.servePlaceholder(w)
+}
+
+func (s *Server) fetchLogo(u string) ([]byte, bool) {
+	req, err := http.NewRequest("GET", u, nil)
+	if err != nil {
+		log.Printf("Error getting image from: %q? (%v)", u, err)
+		return nil, false
+	}
+	req.Header.Set("Accept", "image/jpeg,image/png,image/gif")
+	req.Header.Set("User-Agent", "Retuner/"+config.AppVersion)
+	cl := &http.Client{Timeout: 15 * time.Second}
+	resp, err := cl.Do(req)
+	if err != nil {
+		log.Printf("Error getting image from: %q? (%v)", u, err)
+		return nil, false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode/100 != 2 {
+		log.Printf("Error getting image from: %q? (HTTP %d)", u, resp.StatusCode)
+		return nil, false
+	}
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, iconMaxBytes+1))
+	if err != nil || len(raw) == 0 || len(raw) > iconMaxBytes {
+		log.Printf("Error getting image from: %q? (empty, unreadable or over %d bytes)", u, iconMaxBytes)
+		return nil, false
+	}
+	cfgImg, _, err := image.DecodeConfig(bytes.NewReader(raw))
+	if err != nil {
+		log.Printf("Unsupported image type: %q", u)
+		return nil, false
+	}
+	if cfgImg.Width > iconMaxEdge || cfgImg.Height > iconMaxEdge || cfgImg.Width*cfgImg.Height > iconMaxPixels {
+		log.Printf("Unsupported stream with image type: %q? /image too large/", u)
+		return nil, false
+	}
+	src, _, err := image.Decode(bytes.NewReader(raw))
+	if err != nil {
+		log.Printf("Unsupported stream with image type: %q? /%v/", u, err)
+		return nil, false
+	}
+	w, h := src.Bounds().Dx(), src.Bounds().Dy()
+	if w > s.iconSize || h > s.iconSize {
+		f := float64(s.iconSize) / float64(h)
+		if w >= h {
+			f = float64(s.iconSize) / float64(w)
+		}
+		nw, nh := int(math.Round(float64(w)*f)), int(math.Round(float64(h)*f))
+		if nw < 1 {
+			nw = 1
+		}
+		if nh < 1 {
+			nh = 1
+		}
+		src = scale(src, nw, nh)
+	}
+	var out bytes.Buffer
+	if err := jpeg.Encode(&out, flatten(src), &jpeg.Options{Quality: 75}); err != nil {
+		return nil, false
+	}
+	return out.Bytes(), true
+}
+
+// flatten puts the image over white; JPEG has no alpha.
+func flatten(src image.Image) image.Image {
+	dst := image.NewRGBA(src.Bounds())
+	draw.Draw(dst, dst.Bounds(), image.White, image.Point{}, draw.Src)
+	draw.Draw(dst, dst.Bounds(), src, src.Bounds().Min, draw.Over)
+	return dst
 }
 
 func (s *Server) placeholder() []byte {

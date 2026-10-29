@@ -2,16 +2,15 @@
 package main
 
 import (
-	"flag"
 	"hash/crc32"
 	"log"
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
-	"path/filepath"
 	"retuner/internal/bookmark"
 	"retuner/internal/config"
 	"retuner/internal/dnsserver"
@@ -35,12 +34,15 @@ func localIP(v string) string {
 }
 
 func main() {
-	port := flag.Int("p", 0, "web server port (overrides the ini)")
-	iniPath := flag.String("c", "retuner.ini", "path to retuner.ini")
-	flag.Parse()
+	// Like the Pascal build: no command line options (anything given is ignored),
+	// retuner.ini lives beside the executable.
+	iniPath := "retuner.ini"
+	if exe, err := os.Executable(); err == nil {
+		iniPath = filepath.Join(filepath.Dir(exe), "retuner.ini")
+	}
 	log.Printf("Retuner (Go port) - %s", config.AppCopyright)
 
-	cfg, err := config.Load(*iniPath)
+	cfg, err := config.Load(iniPath)
 	if err != nil {
 		log.Fatalf("config: %v", err)
 	}
@@ -141,9 +143,6 @@ func main() {
 	}
 
 	wp := cfg.Int("WebServer", "WebServerPort", 80)
-	if *port != 0 {
-		wp = *port
-	}
 	bind := cfg.Str("WebServer", "WebServerIPAddress")
 	if bind == "default" {
 		bind = my
