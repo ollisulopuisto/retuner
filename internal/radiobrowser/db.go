@@ -297,8 +297,8 @@ func (b *DB) execWithJSON(d *sql.DB, steps, path string) error {
 		}
 	}
 	return nil
-}
-
+func viewName(a *config.AVR) string {
+	return "avr_" + strconv.FormatUint(uint64(a.FileCRC), 10)
 var safeSQLIdent = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
 
 func isSafeSQLIdent(s string) bool {
@@ -327,7 +327,7 @@ func deleteSection(lines []string, marker string) []string {
 		}
 		if end < len(lines) {
 			end++
-		}
+	name := viewName(a)
 		lines = append(lines[:start], lines[end:]...)
 	}
 }
