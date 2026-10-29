@@ -36,7 +36,7 @@ like the Pascal release for the same requests.
 | radio-browser + db (radiobrowser*.pas)              | todo    | test-radiobrowser.sh |
 | presets (presets.pas)                               | todo    | test-presets.sh |
 | podcasts (podcasts.pas)                             | todo    | |
-| DNS server (dnsserver.pas)                          | todo    | fuzz-test.sh (DNS packets) |
+| DNS server (dnsserver.pas)                          | partial | miekg/dns. fuzz-test.sh DNS phase passes (malformed packets, intercept list 14/14, control name); dns-parity.sh: raw replies identical for 8 cases (A, AAAA, MX, case, apex, not intercepted without upstream). Not verified: forwarding to a real upstream, RestrictForwarding/AllowedClients on the wire, TCP. Later fuzz-test phases (radio-browser, icons) fail until those are ported |
 | web GUI / remote / relay / maintenance / updater    | todo    | test-webgui.sh, test-remote.sh, test-update.sh |
 | translator, threadtimer                             | todo    | |
 

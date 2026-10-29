@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"retuner/internal/bookmark"
 	"retuner/internal/config"
+	"retuner/internal/dnsserver"
 	"retuner/internal/server"
 	"retuner/internal/stations"
 )
@@ -58,6 +59,23 @@ func main() {
 	lim := cfg.Int("Bookmark", "BookmarkStationsLimit", 100)
 	bm := &bookmark.Store{Dir: cfg.ConfigDir(), Common: cfg.Bool("Bookmark", "CommonBookmark"), Limit: lim, URLHost: urlHost}
 
+	var dnsSrv *dnsserver.Server
+	if cfg.Bool("DNSServer", "Enable") {
+		dnsSrv = dnsserver.New(cfg.Str("DNSServer", "InterceptDNs"), cfg.Str("DNSServer", "DNSServers"),
+			cfg.Str("DNSServer", "DNSAdvertiseIP"), cfg.Bool("DNSServer", "RestrictForwarding"), cfg.Str("DNSServer", "AllowedClients"))
+		dip := cfg.Str("DNSServer", "DNSServerIPAddress")
+		if dip == "default" {
+			dip = my
+		}
+		dport := cfg.Int("DNSServer", "DNSServerPort", 53)
+		go func() {
+			log.Printf("DNS Service: listening on: %s:%d", dip, dport)
+			if err := dnsSrv.Start(dip, dport); err != nil {
+				log.Printf("DNS Server error: %v", err)
+			}
+		}()
+	}
+
 	wp := cfg.Int("WebServer", "WebServerPort", 80)
 	if *port != 0 {
 		wp = *port
@@ -68,7 +86,7 @@ func main() {
 	}
 	addr := net.JoinHostPort(bind, strconv.Itoa(wp))
 	log.Printf("Web Service: listening on: %s", addr)
-	if err := http.ListenAndServe(addr, server.New(cfg, avr, urlHost, store, bm).Handler()); err != nil {
+	if err := http.ListenAndServe(addr, server.New(cfg, avr, urlHost, store, bm, dnsSrv).Handler()); err != nil {
 		log.Printf("web service: %v", err)
 		os.Exit(1)
 	}

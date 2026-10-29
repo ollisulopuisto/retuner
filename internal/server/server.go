@@ -11,6 +11,7 @@ import (
 	"image/draw"
 	"image/jpeg"
 	"image/png"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -19,6 +20,7 @@ import (
 
 	"retuner/internal/bookmark"
 	"retuner/internal/config"
+	"retuner/internal/dnsserver"
 	"retuner/internal/stations"
 	"retuner/internal/vtuner"
 )
@@ -41,18 +43,19 @@ type Server struct {
 	store     *stations.Store
 	mystOn    bool
 	bm        *bookmark.Store
+	dns       *dnsserver.Server
 
 	iconOnce  sync.Once
 	iconBytes []byte
 }
 
-func New(cfg *config.Config, avr *config.AVR, urlHost string, store *stations.Store, bm *bookmark.Store) *Server {
+func New(cfg *config.Config, avr *config.AVR, urlHost string, store *stations.Store, bm *bookmark.Store, dns *dnsserver.Server) *Server {
 	size := cfg.Int("Configuration", "IconSize", 200)
 	if size <= 0 {
 		size = 200
 	}
 	s := &Server{cfg: cfg, avr: avr, urlHost: urlHost, token: cfg.Str("Configuration", "MyToken"), iconSize: size,
-		placehold: true, bookmarks: cfg.Bool("Bookmark", "Enable"), bm: bm, store: store, mystOn: cfg.Bool("MyStations", "Enable")}
+		placehold: true, bookmarks: cfg.Bool("Bookmark", "Enable"), bm: bm, dns: dns, store: store, mystOn: cfg.Bool("MyStations", "Enable")}
 	if s.token == "" {
 		s.token = "0123456789ABCDEF"
 	}
@@ -133,6 +136,13 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
+	// The AVR's entry point is where we learn the address a device really reaches
+	// us from; on a public host that address may then have its lookups forwarded.
+	if s.dns != nil {
+		if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+			s.dns.NoteWebClient(host)
+		}
+	}
 	if r.URL.Query().Get("token") == "0" {
 		s.respond(w, http.StatusOK, "application/xml", []byte(vtuner.Token(s.token)))
 		return
