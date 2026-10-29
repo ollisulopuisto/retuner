@@ -53,7 +53,7 @@ def station(i, name, url, bitrate, codec):
         "changeuuid": "1111111%d-0000-0000-0000-11111111111%d" % (i, i),
         "stationuuid": "0000000%d-0000-0000-0000-00000000000%d" % (i, i),
         "serveruuid": "2222222%d-0000-0000-0000-22222222222%d" % (i, i),
-        "name": name,
+        "name": name + (" \u00d1andú \u0141ód\u017a \u01c5 \u0191\u00df \u0153 \u00e9\u00e8 caf\u00e9" if os.environ.get("RB_DIAC") else ""),
         "url": url,
         "url_resolved": url,
         "homepage": "http://example.com/",

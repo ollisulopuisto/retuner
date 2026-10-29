@@ -18,6 +18,7 @@ start() { # $1=name $2=bin $3=web port $4=mock port
   mkdir -p "$WORK/$1/config"
   cp "$2" "$WORK/$1/retuner"
   cp "$HERE/../cfg/avr.ini" "$WORK/$1/config/avr.ini" 2>/dev/null || true
+  if [ -n "${RB_DIAC:-}" ]; then sed -i 's/^\(ReplaceUTF8Latin1[A-Za-z]*\)=0/\1=1/' "$WORK/$1/config/avr.ini"; fi
   RB_LOG="$WORK/$1.rblog" python3 "$HERE/testdata/mock-radiobrowser.py" "$4" ok >/dev/null 2>&1 &
   PIDS="$PIDS $!"
   i=0
@@ -68,6 +69,7 @@ while IFS= read -r url; do
   done
   case $url in */icon*) # two JPEG encoders never agree to the byte: compare status and type only
     for n in ref new; do sed -n 1,2p "$WORK/$n.cmp" > "$WORK/$n.c2"; mv "$WORK/$n.c2" "$WORK/$n.cmp"; done ;; esac
+  cat "$WORK/new.cmp" >> "$WORK/all.new"; cat "$WORK/ref.cmp" >> "$WORK/all.ref"
   if cmp -s "$WORK/ref.cmp" "$WORK/new.cmp"; then echo "  same  $url"; else echo "  DIFF  $url"; diff "$WORK/ref.cmp" "$WORK/new.cmp" | head -10; fail=1; fi
 done <<'EOU'
 /setupapp/x/loginxml.asp?mac=aabbccddee

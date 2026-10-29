@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"retuner/internal/translator"
 	"strings"
 
 	"retuner/internal/config"
@@ -64,12 +65,20 @@ func (s *Server) rbByID(id string, r *http.Request) (radiobrowser.Station, bool)
 
 func (s *Server) rbStation(st radiobrowser.Station, genre string, r *http.Request) vtuner.Station {
 	uid := s.rbUID(st)
+	name, country := st.Name, st.Country
+	if a, _ := s.avrFor(r); a != nil {
+		t := a.Translator
+		if t.ReplaceLatin1Supplement || t.ReplaceExtA || t.ReplaceExtB {
+			name = translator.ReplaceDiacritics(name, t.ReplaceLatin1Supplement, t.ReplaceExtA, t.ReplaceExtB)
+			country = translator.ReplaceDiacritics(country, t.ReplaceLatin1Supplement, t.ReplaceExtA, t.ReplaceExtB)
+		}
+	}
 	g := st.Tags
 	if g == "" {
 		g = genre
 	}
 	return vtuner.Station{
-		UID: uid, Name: st.Name, Description: st.Name + " : " + st.Homepage, Location: st.Country,
+		UID: uid, Name: name, Description: name + " : " + st.Homepage, Location: country,
 		URL: s.listURL(st.URL, uid, r), Genre: g, Mime: strings.ToUpper(st.Codec), Bitrate: st.Bitrate,
 		Icon:     "http://" + s.urlHost + "/" + pathRoot + "/icon?id=" + uid,
 		Bookmark: "http://" + s.urlHost + "/setupapp/favxml.asp?id=" + uid + "&fav=add",
