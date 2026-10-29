@@ -44,7 +44,8 @@ like the Pascal release for the same requests.
 | playlist resolution (ResolvePlaylists)              | done*   | playlist-parity.sh (pls/m3u/asx/xspf, nested, empty, self-reference, 70 KB, 404; resolve=1 and 0): listings, play redirects and the requests the mock saw identical to Pascal. *Relay URLs (NeedsRelay) are not handled; Content-Length now always sent (Pascal never chunks) |
 | web GUI security                                    | tested  | webgui_test.go: client filter runs before auth (503, no challenge), IPv6/mapped/malformed entries refused, foreign Host without credentials gets 401 only, non-JSON POST refused before any write. Like Pascal there is no Host-header check: credentials plus the client filter are the only gates |
 | updater: functional parity                          | partial | The updater is the shared shell script, not code in either binary, and Pascal has no self-update. It works with a Go release only if the archive keeps the retuner-<ver>-<target>/retuner layout; Go build/release packaging (script/build.sh, release.yml) is not ported or tested |
-| relay / maintenance / podcasts / translator         | todo    | no suite beyond test-leaks (not meaningful yet) |
+| HTTPS relay (relayserver.pas)                       | done*   | relay-parity.sh: listing points https stations at the relay; relay replies (headers, first 3000 bytes, ICY handling, 404, 502 path, reconnects) and upstream request logs identical to Pascal. *Upstream is plain http in the test (no TLS mock), so https fetch is Go's TLS stack, untested against a real https stream. Podcast ids are not resolved (podcasts not ported). Timing-based (2 s reconnect pause) |
+| maintenance / podcasts / translator                 | todo    | no suite beyond test-leaks (not meaningful yet) |
 | translator, threadtimer                             | todo    | |
 
 ## Notes

@@ -31,6 +31,7 @@ import (
 	"retuner/internal/dnsserver"
 	"retuner/internal/playlist"
 	"retuner/internal/radiobrowser"
+	"retuner/internal/relay"
 	"retuner/internal/stations"
 	"retuner/internal/vtuner"
 )
@@ -546,6 +547,9 @@ func (s *Server) stripHTTPS(u string, r *http.Request) string {
 // listURL is the URL a listing hands the receiver: the stripped stream URL, or
 // our play endpoint when it is a playlist that must be unwrapped on selection.
 func (s *Server) listURL(raw, uid string, r *http.Request) string {
+	if s.cfg.Bool("Configuration", "RelayHTTPS") && relay.NeedsRelay(raw) {
+		return relay.URLFor(s.urlHost, s.cfg.Int("Configuration", "RelayPort", 8888), uid)
+	}
 	u := s.stripHTTPS(raw, r)
 	if s.cfg.Bool("Configuration", "ResolvePlaylists") && playlist.Looks(u) {
 		return "http://" + s.urlHost + "/" + pathRoot + "/play?id=" + uid
@@ -669,4 +673,19 @@ func (s *Server) favorite(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.display(w, msgNoStations)
+}
+
+// RelayResolve maps a station id to its stream URL for the relay listener.
+func (s *Server) RelayResolve(id string) string {
+	switch {
+	case strings.HasPrefix(id, stations.Prefix+"_"):
+		if _, st, ok := s.store.ByID(id); ok {
+			return st.URL
+		}
+	case strings.HasPrefix(id, "RB_") && s.rb != nil && len(id) >= 15:
+		if st, ok := s.rb.ByID(id[3:15], s.avr, ""); ok {
+			return st.URL
+		}
+	}
+	return ""
 }

@@ -15,8 +15,10 @@ import (
 	"retuner/internal/bookmark"
 	"retuner/internal/config"
 	"retuner/internal/dnsserver"
+	"retuner/internal/playlist"
 	"retuner/internal/presets"
 	"retuner/internal/radiobrowser"
+	"retuner/internal/relay"
 	"retuner/internal/server"
 	"retuner/internal/stations"
 	"retuner/internal/webgui"
@@ -175,7 +177,15 @@ func main() {
 	}
 	addr := net.JoinHostPort(bind, strconv.Itoa(wp))
 	log.Printf("Web Service: listening on: %s", addr)
-	if err := http.ListenAndServe(addr, server.New(cfg, avr, urlHost, store, bm, dnsSrv, rb).Handler()); err != nil {
+	srv := server.New(cfg, avr, urlHost, store, bm, dnsSrv, rb)
+	if cfg.Bool("Configuration", "RelayHTTPS") {
+		rl := &relay.Server{Resolve: srv.RelayResolve, Playlists: cfg.Bool("Configuration", "ResolvePlaylists"),
+			Resolver: &playlist.Resolver{UserAgent: "Retuner/" + config.AppVersion}, UserAgent: "Retuner/" + config.AppVersion}
+		if err := rl.Start(cfg.Str("WebServer", "WebServerIPAddress"), cfg.Int("Configuration", "RelayPort", 8888)); err != nil {
+			log.Printf("Relay Service: error (%v)", err)
+		}
+	}
+	if err := http.ListenAndServe(addr, srv.Handler()); err != nil {
 		log.Printf("web service: %v", err)
 		os.Exit(1)
 	}
