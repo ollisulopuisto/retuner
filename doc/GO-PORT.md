@@ -84,3 +84,8 @@ Caveat: only these synthetic feeds were compared; real-world feeds are untested.
 ## CI note
 
 Smoke/Test steps hung for six hours on the old scaffold build. Fixed by curl timeouts in `script/` and job timeouts in the workflows; push runs are limited to master, PRs run on their merge result, `workflow_dispatch` is check-only. `release.yml` is the only release path.
+
+## Real Radio Browser data (opt-in, not CI)
+
+`script/rb-real-parity.sh` runs both binaries against the REAL public directory (62k stations, read-only GETs) through a snapshot proxy, so both see identical bytes; the Pascal binary here has no usable OpenSSL, hence plain http to the proxy. With catPermMemDB (the default) and catMemStr: country, genre, language, popular, search and two category pages, byte-identical after one fix. The real data found a difference synthetic mocks could not: Pascal's StripHttps replaces the FIRST `https://` anywhere in the URL (for `http://host/proxy/?q=https://...`), Go only a leading one. Fixed. Still untested: real TLS from the binaries, all-station fan-out beyond those pages, real receivers.
+Also added: the `Status: <code> OK` response header Pascal sends (`404 OK` too).

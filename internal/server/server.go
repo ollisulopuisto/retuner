@@ -98,6 +98,9 @@ func (s *Server) respond(w http.ResponseWriter, code int, ctype string, body []b
 	w.Header().Set("Content-Type", ctype)
 	// Pascal answers with a Content-Length, never chunked; some receivers need that.
 	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+	// Pascal (fphttp) adds a "Status: <code> OK" header, with the text "OK"
+	// whatever the code ("Status: 404 OK"). Kept so the replies match.
+	w.Header().Set("Status", strconv.Itoa(code)+" OK")
 	w.WriteHeader(code)
 	if body != nil {
 		_, _ = w.Write(body)
@@ -562,14 +565,23 @@ done:
 	return
 }
 
+func indexFoldASCII(s, sub string) int {
+	for i := 0; i+len(sub) <= len(s); i++ {
+		if strings.EqualFold(s[i:i+len(sub)], sub) {
+			return i
+		}
+	}
+	return -1
+}
+
 func (s *Server) stripHTTPS(u string, r *http.Request) string {
 	// Protocol=all-as-http is the shipped default of avr.ini; with a common avr.ini
 	// (CommonAVRini=1, the default) it applies to every receiver.
 	if a, _ := s.avrFor(r); a.AllAsHTTP {
-		for _, p := range []string{"https://", "HTTPS://", "Https://"} {
-			if strings.HasPrefix(strings.ToLower(u), strings.ToLower(p)) {
-				return "http://" + u[len(p):]
-			}
+		// Pascal's StringReplace(..., [rfIgnoreCase]) without rfReplaceAll: the
+		// first "https://" anywhere in the URL, not only a leading one.
+		if i := indexFoldASCII(u, "https://"); i >= 0 {
+			return u[:i] + "http://" + u[i+len("https://"):]
 		}
 	}
 	return u
