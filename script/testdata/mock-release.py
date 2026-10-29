@@ -94,23 +94,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
         if "/releases/download/" in path:
             name = path.rsplit("/", 1)[-1]
-            full = os.path.join(ASSET_DIR, os.path.basename(name))
-            # The asset name comes from the request path, so confine the
-            # resolved path to ASSET_DIR: no traversal may read a file
-            # anywhere else. os.path.basename() already strips path parts,
-            # but this check makes the confinement explicit and survives a
-            # future change that drops it.
-            root = os.path.realpath(ASSET_DIR)
-            resolved = os.path.realpath(full)
-            if resolved != root and not resolved.startswith(root + os.sep):
-                self._send(404, "no such asset", "text/plain")
-                return
-            # Pyyntöpolusta johtuva nimi on nyt normalisoitu (realpath) ja
-            # varmistettu ASSET_DIRin sisäiseksi, joten tiedosto avataan
-            # normalisoidusta polusta - ei raakasta pyynnöstä johdetusta
-            # full-polusta. Tämä katkaisee CodeQL:n py/path-injection -datan
-            # kulkun pyynnöstä tiedostopääsyyn.
-            if not os.path.isfile(resolved):
+            # The request only SELECTS an asset: the name is looked up among the
+            # files that exist in ASSET_DIR, and the path that is opened comes
+            # from that directory listing, never from the request. A name that
+            # is not a listed regular file, symlinks excluded (including any "..", "/" or "\\"
+            # trickery) gets a 404.
+            assets = {
+                entry: os.path.join(ASSET_DIR, entry)
+                for entry in os.listdir(ASSET_DIR)
+                if os.path.isfile(os.path.join(ASSET_DIR, entry))
+                and not os.path.islink(os.path.join(ASSET_DIR, entry))
+            }
+            resolved = assets.get(name)
+            if resolved is None:
                 self._send(404, "no such asset", "text/plain")
                 return
             with open(resolved, "rb") as f:
