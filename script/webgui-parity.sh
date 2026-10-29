@@ -76,6 +76,13 @@ req "malformed save" POST /api/stations '{"x":1}'
 req "save with escapes" POST /api/stations '{"categories":[{"name":" New ","stations":[{"name":"A=b|c","url":"http://x|y","logo":"http://l|m"},{"name":"","url":"u"},{"name":"n","url":""}]},{"name":"","stations":[]},{"name":"Empty"}]}'
 req "GET /api/stations after save" GET /api/stations
 cmp -s "$W/ref/config/stations.ini" "$W/new/config/stations.ini" && echo "  same  saved stations.ini" || { echo "  DIFF  saved stations.ini"; diff "$W/ref/config/stations.ini" "$W/new/config/stations.ini"; fail=1; }
+for extra in "" "--interface 127.0.0.2"; do
+  for n in ref:18721 new:18722; do
+    name=${n%%:*}; port=${n##*:}
+    curl -s --noproxy '*' $extra -D - "http://127.0.0.1:$port/api/status" | grep -iv '^date:\|^server:\|^status:' | tr -d '\r' | sort > "$W/$name.raw"
+  done
+  if cmp -s "$W/ref.raw" "$W/new.raw"; then echo "  same  unauthenticated ${extra:-loopback} (status line, headers, body)"; else echo "  DIFF  unauthenticated ${extra:-loopback}"; diff "$W/ref.raw" "$W/new.raw" | head; fail=1; fi
+done
 req "remote cmd GET" GET /api/remote/cmd
 req "remote cmd malformed" POST /api/remote/cmd 'x'
 [ $fail -eq 0 ] && echo "All compared responses match." || { echo "Differences found."; exit 1; }

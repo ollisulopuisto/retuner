@@ -15,6 +15,7 @@ import (
 	"retuner/internal/bookmark"
 	"retuner/internal/config"
 	"retuner/internal/dnsserver"
+	"retuner/internal/maintenance"
 	"retuner/internal/playlist"
 	"retuner/internal/presets"
 	"retuner/internal/radiobrowser"
@@ -177,6 +178,20 @@ func main() {
 	}
 	addr := net.JoinHostPort(bind, strconv.Itoa(wp))
 	log.Printf("Web Service: listening on: %s", addr)
+	if cfg.Bool("MaintenanceServer", "Enable") {
+		m := &maintenance.Server{Address: cfg.Str("MaintenanceServer", "MaintenanceServerIPAddress"), Root: "retuner", AppName: config.AppName,
+			Shutdown: func() {
+				log.Printf("%s: Shutting down. Please wait..", config.AppName)
+				log.Printf("%s: Maintenance Service: Shutting down", config.AppName)
+				os.Exit(0)
+			}}
+		if m.Address == "" || m.Address == "default" {
+			m.Address = "127.0.0.1"
+		}
+		if err := m.Start(cfg.Int("MaintenanceServer", "MaintenanceServerPort", 8750)); err != nil {
+			log.Printf("Maintenance Service: error (%v)", err)
+		}
+	}
 	srv := server.New(cfg, avr, urlHost, store, bm, dnsSrv, rb)
 	if cfg.Bool("Configuration", "RelayHTTPS") {
 		rl := &relay.Server{Resolve: srv.RelayResolve, Playlists: cfg.Bool("Configuration", "ResolvePlaylists"),

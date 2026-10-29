@@ -45,7 +45,8 @@ like the Pascal release for the same requests.
 | web GUI security                                    | tested  | webgui_test.go: client filter runs before auth (503, no challenge), IPv6/mapped/malformed entries refused, foreign Host without credentials gets 401 only, non-JSON POST refused before any write. Like Pascal there is no Host-header check: credentials plus the client filter are the only gates |
 | updater: functional parity                          | partial | The updater is the shared shell script, not code in either binary, and Pascal has no self-update. It works with a Go release only if the archive keeps the retuner-<ver>-<target>/retuner layout; Go build/release packaging (script/build.sh, release.yml) is not ported or tested |
 | HTTPS relay (relayserver.pas)                       | done*   | relay-parity.sh: listing points https stations at the relay; relay replies (headers, first 3000 bytes, ICY handling, 404, 502 path, reconnects) and upstream request logs identical to Pascal. *Upstream is plain http in the test (no TLS mock), so https fetch is Go's TLS stack, untested against a real https stream. Podcast ids are not resolved (podcasts not ported). Timing-based (2 s reconnect pause) |
-| maintenance / podcasts / translator                 | todo    | no suite beyond test-leaks (not meaningful yet) |
+| maintenance (/retuner/down)                         | done*   | maintenance-parity.sh: 503 for another client address (127.0.0.2 vs 127.0.0.1), 404, shutdown reply text and the process exiting: identical to Pascal incl. content types. *Shutdown is os.Exit after the reply; Pascal frees resources in order and logs each step (log wording shortened) |
+| podcasts / translator                               | todo    | no suite beyond test-leaks (not meaningful yet) |
 | translator, threadtimer                             | todo    | |
 
 ## Notes

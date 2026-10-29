@@ -139,6 +139,14 @@ func (s *Server) authorised(r *http.Request) bool {
 	return uo&po == 1
 }
 
+// plain answers like the Pascal unit: text/html, explicit Content-Length.
+func plain(w http.ResponseWriter, code int, body string) {
+	w.Header().Set("Content-Type", "text/html")
+	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+	w.WriteHeader(code)
+	io.WriteString(w, body)
+}
+
 type jobj = map[string]any
 
 func sendJSON(w http.ResponseWriter, code int, body string) {
@@ -277,16 +285,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	host, _, _ := net.SplitHostPort(r.RemoteAddr)
 	if !s.clientAllowed(host) {
 		log.Printf("%s: refused %s from %s (WebGUIIPAddress=%s)", service, r.URL.RequestURI(), host, s.Allowed)
-		w.WriteHeader(http.StatusServiceUnavailable)
-		io.WriteString(w, "Service unavailable.")
+		plain(w, http.StatusServiceUnavailable, "Service unavailable.\n")
 		return
 	}
 	if !s.authorised(r) {
 		time.Sleep(failedAuthDelay)
 		log.Printf("%s: unauthorised %s from %s", service, r.URL.RequestURI(), host)
-		w.Header().Set("WWW-Authenticate", `Basic realm="`+realm+`"`)
-		w.WriteHeader(401)
-		io.WriteString(w, "Authentication required.")
+		w.Header()["WWW-Authenticate"] = []string{`Basic realm="` + realm + `"`}
+		plain(w, 401, "Authentication required.\n")
 		return
 	}
 	if r.Method == "POST" && !strings.HasPrefix(strings.ToLower(r.Header.Get("Content-Type")), "application/json") {
