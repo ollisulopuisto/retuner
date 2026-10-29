@@ -21,6 +21,7 @@ import (
 	"retuner/internal/bookmark"
 	"retuner/internal/config"
 	"retuner/internal/dnsserver"
+	"retuner/internal/radiobrowser"
 	"retuner/internal/stations"
 	"retuner/internal/vtuner"
 )
@@ -44,18 +45,23 @@ type Server struct {
 	mystOn    bool
 	bm        *bookmark.Store
 	dns       *dnsserver.Server
+	rb        *radiobrowser.Client
+	localCtry string
+	commonAVR bool
+	avrMu     sync.Mutex
+	avrs      map[string]*config.AVR
 
 	iconOnce  sync.Once
 	iconBytes []byte
 }
 
-func New(cfg *config.Config, avr *config.AVR, urlHost string, store *stations.Store, bm *bookmark.Store, dns *dnsserver.Server) *Server {
+func New(cfg *config.Config, avr *config.AVR, urlHost string, store *stations.Store, bm *bookmark.Store, dns *dnsserver.Server, rb *radiobrowser.Client) *Server {
 	size := cfg.Int("Configuration", "IconSize", 200)
 	if size <= 0 {
 		size = 200
 	}
 	s := &Server{cfg: cfg, avr: avr, urlHost: urlHost, token: cfg.Str("Configuration", "MyToken"), iconSize: size,
-		placehold: true, bookmarks: cfg.Bool("Bookmark", "Enable"), bm: bm, dns: dns, store: store, mystOn: cfg.Bool("MyStations", "Enable")}
+		placehold: true, bookmarks: cfg.Bool("Bookmark", "Enable"), bm: bm, dns: dns, rb: rb, avrs: map[string]*config.AVR{}, commonAVR: cfg.Int("Configuration", "CommonAVRini", 1) != 0, localCtry: strings.TrimSpace(cfg.Str("Configuration", "LocalCountry")), store: store, mystOn: cfg.Bool("MyStations", "Enable")}
 	if s.token == "" {
 		s.token = "0123456789ABCDEF"
 	}
@@ -99,6 +105,10 @@ func (s *Server) Handler() http.Handler {
 			s.login(w, r)
 		case strings.HasPrefix(lp, "/setupapp/") && strings.HasSuffix(lp, "/statxml.asp") && lp != "/setupapp/statxml.asp":
 			s.station(w, r)
+		case strings.HasPrefix(lp, "/setupapp/") && strings.HasSuffix(lp, "/search.asp") && lp != "/setupapp/search.asp" && s.rb != nil:
+			s.search(w, r)
+		case strings.HasPrefix(lp, "/setupapp/") && strings.HasSuffix(lp, "/navxml.asp") && lp != "/setupapp/navxml.asp" && s.rb != nil:
+			s.rbRoot(w, r)
 		case lp == "/setupapp/favxml.asp":
 			s.favorite(w, r)
 		default:
@@ -122,6 +132,27 @@ func (s *Server) Handler() http.Handler {
 				case "/" + root + "/play":
 					s.play(w, r)
 					return
+				case "/" + root + "/search":
+					if s.rb != nil {
+						s.search(w, r)
+						return
+					}
+				case "/" + root + "/radiobrowser":
+					if s.rb != nil {
+						s.rbRoot(w, r)
+						return
+					}
+				}
+				if pre := "/" + root + "/radiobrowser/"; s.rb != nil && strings.HasPrefix(lp, pre) && len(lp) > len(pre) {
+					parts := strings.Split(r.URL.EscapedPath()[len(pre):], "/")
+					if len(parts) == 1 {
+						s.rbCategory(w, r, httpDecode(parts[0]), "", false)
+						return
+					}
+					if len(parts) == 2 && parts[1] != "" {
+						s.rbCategory(w, r, httpDecode(parts[0]), parts[1], true)
+						return
+					}
 				}
 				if pre := "/" + root + "/mystations/"; strings.HasPrefix(lp, pre) && len(lp) > len(pre) && !strings.Contains(lp[len(pre):], "/") {
 					esc := r.URL.EscapedPath()
@@ -148,7 +179,8 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p := &vtuner.Page{}
-	for _, mi := range s.avr.MainMenu {
+	a, _ := s.avrFor(r)
+	for _, mi := range a.MainMenu {
 		switch mi.Identifier {
 		case "mystations":
 			if s.mystOn {
@@ -158,10 +190,18 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 			if s.bookmarks {
 				p.Add(s.dir(mi.Label, pathRoot+"/bookmark", s.bm.Count(r.URL.Query().Get("mac"))))
 			}
+		case "radiobrowser":
+			if s.rb != nil {
+				p.Add(s.dir(mi.Label, pathRoot+"/radiobrowser", 4))
+			}
+		case "local":
+			if s.rb != nil && s.localCtry != "" {
+				p.Add(s.dir(mi.Label, pathRoot+"/radiobrowser/country/"+urlEncode(s.localCtry), s.rb.PopLimit))
+			}
 		case "about":
 			p.Add(s.dir(mi.Label, pathRoot+"/about", 2))
 		}
-		// mystations, radiobrowser, local, podcasts: added in later stages.
+		// podcasts: added in a later stage.
 	}
 	// Pascal order follows the avr.ini list; about comes first by default.
 	p.TotalItemsCount = len(p.Items)
@@ -180,6 +220,16 @@ func (s *Server) station(w http.ResponseWriter, r *http.Request) {
 			s.page(w, p)
 			return
 		}
+	}
+	if len(id) >= 3 && strings.HasPrefix(id, "RB_") && s.rb != nil {
+		if st, ok := s.rbByID(id, r); ok && st.ID != "" {
+			p := &vtuner.Page{TotalItemsCount: 1}
+			p.Add(s.rbStation(st, "", r))
+			s.page(w, p)
+			return
+		}
+		s.display(w, msgNoStations)
+		return
 	}
 	if len(id) >= 3 && id[2] == 'B' {
 		body, ok := s.bm.StationInfo(r.URL.Query().Get("mac"), id)
@@ -346,10 +396,10 @@ done:
 	return
 }
 
-func (s *Server) stripHTTPS(u string) string {
+func (s *Server) stripHTTPS(u string, r *http.Request) string {
 	// Protocol=all-as-http is the shipped default of avr.ini; with a common avr.ini
 	// (CommonAVRini=1, the default) it applies to every receiver.
-	if s.avr.AllAsHTTP {
+	if a, _ := s.avrFor(r); a.AllAsHTTP {
 		for _, p := range []string{"https://", "HTTPS://", "Https://"} {
 			if strings.HasPrefix(strings.ToLower(u), strings.ToLower(p)) {
 				return "http://" + u[len(p):]
@@ -363,7 +413,7 @@ func (s *Server) vtunerStation(cat string, st stations.Station, r *http.Request)
 	return vtuner.Station{
 		UID: st.ID, Name: st.Name,
 		Description: "My favorite \"" + st.Name + "\"",
-		URL:         s.stripHTTPS(st.URL),
+		URL:         s.stripHTTPS(st.URL, r),
 		Icon:        "http://" + s.urlHost + "/" + pathRoot + "/icon?id=" + st.ID,
 		Genre:       cat,
 		Bookmark:    "http://" + s.urlHost + "/setupapp/favxml.asp?id=" + st.ID + "&fav=add",
@@ -417,7 +467,12 @@ func (s *Server) play(w http.ResponseWriter, r *http.Request) {
 	target := ""
 	if len(id) >= 2 && id[:2] == stations.Prefix {
 		if _, st, ok := s.store.ByID(id); ok {
-			target = s.stripHTTPS(st.URL)
+			target = s.stripHTTPS(st.URL, r)
+		}
+	}
+	if strings.HasPrefix(id, "RB_") {
+		if st, ok := s.rbByID(id, r); ok {
+			target = s.stripHTTPS(st.URL, r)
 		}
 	}
 	if target == "" {

@@ -16,6 +16,7 @@ import (
 	"retuner/internal/config"
 	"retuner/internal/dnsserver"
 	"retuner/internal/presets"
+	"retuner/internal/radiobrowser"
 	"retuner/internal/server"
 	"retuner/internal/stations"
 )
@@ -51,6 +52,18 @@ func main() {
 	avr, err := cfg.LoadAVR()
 	if err != nil {
 		log.Fatalf("avr.ini: %v", err)
+	}
+	var rb *radiobrowser.Client
+	if cfg.Int("RadioBrowser", "Enable", 1) != 0 {
+		ct := cfg.Str("RadioBrowser", "RBCacheType")
+		if ct == "catDB" || ct == "catMemDB" || ct == "catPermMemDB" {
+			log.Printf("RBCacheType=%s needs the SQLite cache, which the Go port does not have yet; using the in-memory cache", ct)
+		}
+		rb = radiobrowser.New(cfg.Str("RadioBrowser", "RBAPIURL"), "Retuner/"+config.AppVersion,
+			cfg.Int("RadioBrowser", "RBPopularAndSearchStationsLimit", 100), cfg.Int("RadioBrowser", "RBMinStationsPerCategory", 3), ct, cfg.Int("RadioBrowser", "RBCacheTTL", 0))
+	}
+	if rb != nil && rb.CacheType != "catDB" && rb.CacheType != "catMemDB" && rb.CacheType != "catPermMemDB" {
+		rb.StartUUIDs(cfg.CacheDir(), cfg.Int("RadioBrowser", "RBUUIDsCacheTTL", 0), cfg.Bool("RadioBrowser", "RBUUIDsCacheAutoRefresh"))
 	}
 	my := localIP(cfg.Str("Configuration", "IPAddress"))
 	urlHost := cfg.Str("Configuration", "ActAsHost")
@@ -137,7 +150,7 @@ func main() {
 	}
 	addr := net.JoinHostPort(bind, strconv.Itoa(wp))
 	log.Printf("Web Service: listening on: %s", addr)
-	if err := http.ListenAndServe(addr, server.New(cfg, avr, urlHost, store, bm, dnsSrv).Handler()); err != nil {
+	if err := http.ListenAndServe(addr, server.New(cfg, avr, urlHost, store, bm, dnsSrv, rb).Handler()); err != nil {
 		log.Printf("web service: %v", err)
 		os.Exit(1)
 	}

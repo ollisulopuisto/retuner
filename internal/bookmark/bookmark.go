@@ -240,3 +240,14 @@ func replaceFold(s, old, new string) string {
 	}
 	return regexp.MustCompile(`(?i)`+regexp.QuoteMeta(old)).ReplaceAllLiteralString(s, new)
 }
+
+// HasFile reports whether <dev>.xml exists in the config folder, which is how a
+// "play" search decides whether the device has bookmarks (FileExists in the
+// Pascal build). Names that are not plain file names never match.
+func (s *Store) HasFile(dev string) bool {
+	if !safeMAC.MatchString(dev) {
+		return false
+	}
+	_, err := os.Stat(filepath.Join(s.Dir, dev+".xml"))
+	return err == nil
+}

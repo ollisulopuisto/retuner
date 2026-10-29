@@ -49,10 +49,10 @@ type Config struct {
 // Load reads path, adds every missing key in default order, and writes the
 // file back only when something was added. A missing file is created.
 func Load(path string) (*Config, error) {
-	f := ini.Empty(ini.LoadOptions{AllowShadows: false})
+	f := ini.Empty(ini.LoadOptions{AllowShadows: false, IgnoreInlineComment: true})
 	if _, err := os.Stat(path); err == nil {
 		var lerr error
-		f, lerr = ini.LoadSources(ini.LoadOptions{}, path)
+		f, lerr = ini.LoadSources(ini.LoadOptions{IgnoreInlineComment: true}, path)
 		if lerr != nil {
 			return nil, lerr
 		}
@@ -145,7 +145,51 @@ type MenuItem struct{ Identifier, Label string }
 
 type AVR struct {
 	MainMenu  []MenuItem
-	AllAsHTTP bool // Protocol=all-as-http: https station URLs are handed to the receiver as http
+	Protocol  string // lower-cased avr.ini [Configuration] Protocol
+	AllAsHTTP bool   // Protocol=all-as-http: https station URLs are handed to the receiver as http
+
+	// [RadioBrowser Filtering]; every list has been through the Pascal strip-chars cleanup.
+	AllowedTags, NotAllowedTags, AllowedCountries, AllowedLanguages    []string
+	AllowedCodecs, NotAllowedCodecs, NotAllowedInName, NotAllowedInURL []string
+	BitrateMax                                                         int
+	// [RadioBrowser Sorting]
+	Order   string
+	Reverse bool
+	// [Translator] - parsed and kept; the translation itself is not ported yet.
+	Translator Translator
+}
+
+type Translator struct {
+	Enabled, Auto                                     bool
+	LanguageCode                                      string
+	ReplaceLatin1Supplement, ReplaceExtA, ReplaceExtB bool
+}
+
+// filterStrip is RB_FILTER_STRIP_CHARS: each is replaced by a space, then the
+// result is trimmed and runs of spaces collapse to one (StripChars/DelSpace1).
+const filterStrip = "!\"'():@&=+$,/?%#[]-.~\n\r\t"
+
+// StripChars mirrors common.pas StripChars for a set of single-byte characters.
+func StripChars(in, chars string) string {
+	var b strings.Builder
+	for i := 0; i < len(in); i++ {
+		if strings.IndexByte(chars, in[i]) >= 0 {
+			b.WriteByte(' ')
+		} else {
+			b.WriteByte(in[i])
+		}
+	}
+	return strings.Join(strings.FieldsFunc(strings.TrimSpace(b.String()), func(r rune) bool { return r == ' ' }), " ")
+}
+
+func filterList(raw string) []string {
+	var out []string
+	for _, e := range strings.Split(StripChars(raw, filterStrip), ";") {
+		if e = strings.TrimSpace(e); e != "" {
+			out = append(out, e)
+		}
+	}
+	return out
 }
 
 const avrIniVersion = "1.0.2"
@@ -164,16 +208,20 @@ var avrDefaults = []section{
 // LoadAVR reads config/avr.ini, creating it with defaults. Mismatched
 // identifier/label counts restore the default menu, as the Pascal build does
 // ("Incorrect values in avr.ini [MainMenu Items] group!").
-func (c *Config) LoadAVR() (*AVR, error) {
+func (c *Config) LoadAVR() (*AVR, error) { return c.LoadAVRFile("avr.ini") }
+
+// LoadAVRFile reads (and completes) one receiver config file in the config folder:
+// avr.ini, or <mac>.ini when CommonAVRini is off.
+func (c *Config) LoadAVRFile(name string) (*AVR, error) {
 	dir := c.ConfigDir()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}
-	p := filepath.Join(dir, "avr.ini")
+	p := filepath.Join(dir, name)
 	f := ini.Empty()
 	if _, err := os.Stat(p); err == nil {
 		var err2 error
-		if f, err2 = ini.Load(p); err2 != nil {
+		if f, err2 = ini.LoadSources(ini.LoadOptions{IgnoreInlineComment: true}, p); err2 != nil {
 			return nil, err2
 		}
 	}
@@ -193,7 +241,24 @@ func (c *Config) LoadAVR() (*AVR, error) {
 			return nil, err
 		}
 	}
-	a := &AVR{AllAsHTTP: strings.EqualFold(f.Section("Configuration").Key("Protocol").String(), "all-as-http")}
+	a := &AVR{Protocol: strings.ToLower(f.Section("Configuration").Key("Protocol").String())}
+	a.AllAsHTTP = a.Protocol == "all-as-http"
+	rf := f.Section("RadioBrowser Filtering")
+	a.AllowedTags, a.NotAllowedTags = filterList(rf.Key("AllowedTags").String()), filterList(rf.Key("NotAllowedTags").String())
+	a.AllowedCountries, a.AllowedLanguages = filterList(rf.Key("AllowedCountries").String()), filterList(rf.Key("AllowedLanguages").String())
+	a.AllowedCodecs, a.NotAllowedCodecs = filterList(rf.Key("AllowedCodecs").String()), filterList(rf.Key("NotAllowedCodecs").String())
+	a.NotAllowedInName, a.NotAllowedInURL = filterList(rf.Key("NotAllowedInName").String()), filterList(rf.Key("NotAllowedInURL").String())
+	a.BitrateMax, _ = rf.Key("BitrateMax").Int()
+	rs := f.Section("RadioBrowser Sorting")
+	a.Order = rs.Key("Order").String()
+	a.Reverse, _ = rs.Key("Reverse").Bool()
+	if v, e := rs.Key("Reverse").Int(); e == nil {
+		a.Reverse = v != 0
+	}
+	tr := f.Section("Translator")
+	tb := func(k string) bool { v, e := tr.Key(k).Int(); return e == nil && v != 0 }
+	a.Translator = Translator{Enabled: tb("Enable"), Auto: tb("Auto"), LanguageCode: strings.ToLower(tr.Key("LanguageCode").String()),
+		ReplaceLatin1Supplement: tb("ReplaceUTF8Latin1Supplement"), ReplaceExtA: tb("ReplaceUTF8Latin1ExtendedA"), ReplaceExtB: tb("ReplaceUTF8Latin1ExtendedB")}
 	for i := range ids {
 		a.MainMenu = append(a.MainMenu, MenuItem{ids[i], labels[i]})
 	}
