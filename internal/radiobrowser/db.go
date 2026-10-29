@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -385,6 +386,12 @@ func (b *DB) ensureView(mac string, a *config.AVR) (string, error) {
 	}
 	if _, err := b.db.Exec(text()); err != nil {
 		return "", fmt.Errorf("create view: %w", err)
+var safeSQLIdent = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+func isSafeSQLIdent(s string) bool {
+	return safeSQLIdent.MatchString(s)
+}
+
 	}
 	b.views[name] = true
 	return name, nil
@@ -419,6 +426,10 @@ func (b *DB) Categories(k Kind, a *config.AVR, mac string, start, howMany int) (
 	}
 	return out, total
 }
+	if !isSafeSQLIdent(v) {
+		log.Printf("Radio-browser database query error (invalid view identifier)")
+		return nil, 0
+	}
 
 func (b *DB) Stations(k Kind, name string, a *config.AVR, mac string, start, howMany int) ([]Station, int) {
 	v, err := b.ensureView(mac, a)
@@ -427,20 +438,45 @@ func (b *DB) Stations(k Kind, name string, a *config.AVR, mac string, start, how
 		return nil, 0
 	}
 	q := script("RBDB_SQL_SELECT_STATIONS")
+	args := make([]any, 0, 3)
 	q = strings.ReplaceAll(q, "@@@AVR", v)
 	dir := "ASC"
-	if a.Reverse {
+		cat, order = dbCategoryField[k]+" = ?", a.Order
+		args = append(args, clean)
 		dir = "DESC"
 	}
 	clean := config.StripChars(httpDecodeName(name), filterStripChars)
-	var cat, order string
+		cat, order = "name LIKE ?", a.Order
+		args = append(args, "%"+clean+"%")
 	switch k {
+
+	allowedOrder := map[string]bool{
+		"name":      true,
+		"votes":     true,
+		"bitrate":   true,
+		"codec":     true,
+		"country":   true,
+		"language":  true,
+		"tags":      true,
+		"homepage":  true,
+		"url":       true,
+		"stationid": true,
+	}
+	if !allowedOrder[order] {
+		order = "name"
+	}
+	if dir != "ASC" && dir != "DESC" {
+		dir = "ASC"
+	}
+
 	case Genre, Country, Language:
 		cat, order = dbCategoryField[k]+"= '"+clean+"'", a.Order
 	case Popular:
-		cat, order, dir = "tc=1", "votes", "DESC"
-	case Search:
-		cat, order = "name LIKE '%"+clean+"%'", a.Order
+	q = strings.ReplaceAll(q, "@@@Start", "?")
+	q = strings.ReplaceAll(q, "@@@Offset", "?")
+	args = append(args, start, howMany)
+
+	rows, err := b.db.Query(q, args...)
 	}
 	q = strings.ReplaceAll(q, "@@@Category", cat)
 	q = strings.ReplaceAll(q, "@@@Order", order)
