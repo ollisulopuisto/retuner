@@ -5,8 +5,8 @@ package vtuner
 
 import (
 	"bytes"
-	"encoding/xml"
 	"strconv"
+	"strings"
 )
 
 const PathParamDummy = "?retuner=true"
@@ -37,9 +37,9 @@ type Page struct {
 func (p *Page) Add(i Item) { p.Items = append(p.Items, i) }
 
 func esc(s string) string {
-	var b bytes.Buffer
-	_ = xml.EscapeText(&b, []byte(s))
-	return b.String()
+	// FPC's WriteXML escapes & < > in text and leaves quotes alone; encoding/xml
+	// would write &#34; for a quote, which the parity diff caught.
+	return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace(s)
 }
 
 func el(b *bytes.Buffer, name, val string) {

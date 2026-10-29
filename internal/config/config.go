@@ -107,7 +107,8 @@ func (c *Config) ConfigDir() string {
 type MenuItem struct{ Identifier, Label string }
 
 type AVR struct {
-	MainMenu []MenuItem
+	MainMenu  []MenuItem
+	AllAsHTTP bool // Protocol=all-as-http: https station URLs are handed to the receiver as http
 }
 
 const avrIniVersion = "1.0.2"
@@ -155,7 +156,7 @@ func (c *Config) LoadAVR() (*AVR, error) {
 			return nil, err
 		}
 	}
-	a := &AVR{}
+	a := &AVR{AllAsHTTP: strings.EqualFold(f.Section("Configuration").Key("Protocol").String(), "all-as-http")}
 	for i := range ids {
 		a.MainMenu = append(a.MainMenu, MenuItem{ids[i], labels[i]})
 	}

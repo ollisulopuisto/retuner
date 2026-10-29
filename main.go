@@ -9,8 +9,10 @@ import (
 	"os"
 	"strconv"
 
+	"path/filepath"
 	"retuner/internal/config"
 	"retuner/internal/server"
+	"retuner/internal/stations"
 )
 
 func localIP(v string) string {
@@ -46,6 +48,12 @@ func main() {
 		urlHost = my
 	}
 
+	store := &stations.Store{Own: filepath.Join(cfg.ConfigDir(), cfg.Str("MyStations", "MyStationsFile"))}
+	if cfg.Bool("MyStations", "Enable") {
+		own, pre := store.Reload()
+		log.Printf("My stations: loaded %d (%d from presets)", own+pre, pre)
+	}
+
 	wp := cfg.Int("WebServer", "WebServerPort", 80)
 	if *port != 0 {
 		wp = *port
@@ -56,7 +64,7 @@ func main() {
 	}
 	addr := net.JoinHostPort(bind, strconv.Itoa(wp))
 	log.Printf("Web Service: listening on: %s", addr)
-	if err := http.ListenAndServe(addr, server.New(cfg, avr, urlHost).Handler()); err != nil {
+	if err := http.ListenAndServe(addr, server.New(cfg, avr, urlHost, store).Handler()); err != nil {
 		log.Printf("web service: %v", err)
 		os.Exit(1)
 	}

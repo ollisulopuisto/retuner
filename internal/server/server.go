@@ -12,10 +12,13 @@ import (
 	"image/jpeg"
 	"image/png"
 	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 
 	"retuner/internal/config"
+	"retuner/internal/stations"
 	"retuner/internal/vtuner"
 )
 
@@ -34,18 +37,20 @@ type Server struct {
 	iconSize  int
 	placehold bool
 	bookmarks bool
+	store     *stations.Store
+	mystOn    bool
 
 	iconOnce  sync.Once
 	iconBytes []byte
 }
 
-func New(cfg *config.Config, avr *config.AVR, urlHost string) *Server {
+func New(cfg *config.Config, avr *config.AVR, urlHost string, store *stations.Store) *Server {
 	size := cfg.Int("Configuration", "IconSize", 200)
 	if size <= 0 {
 		size = 200
 	}
 	s := &Server{cfg: cfg, avr: avr, urlHost: urlHost, token: cfg.Str("Configuration", "MyToken"), iconSize: size,
-		placehold: true, bookmarks: cfg.Bool("Bookmark", "Enable")}
+		placehold: true, bookmarks: cfg.Bool("Bookmark", "Enable"), store: store, mystOn: cfg.Bool("MyStations", "Enable")}
 	if s.token == "" {
 		s.token = "0123456789ABCDEF"
 	}
@@ -104,7 +109,16 @@ func (s *Server) Handler() http.Handler {
 					s.icon(w, r)
 					return
 				case "/" + root + "/mystations":
-					s.display(w, msgNoStations)
+					s.myStations(w, r)
+					return
+				case "/" + root + "/play":
+					s.play(w, r)
+					return
+				}
+				if pre := "/" + root + "/mystations/"; strings.HasPrefix(lp, pre) && len(lp) > len(pre) && !strings.Contains(lp[len(pre):], "/") {
+					esc := r.URL.EscapedPath()
+					seg := esc[len(pre):]
+					s.myStationsOfCategory(w, r, httpDecode(seg))
 					return
 				}
 			}
@@ -121,6 +135,10 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	p := &vtuner.Page{}
 	for _, mi := range s.avr.MainMenu {
 		switch mi.Identifier {
+		case "mystations":
+			if s.mystOn {
+				p.Add(s.dir(mi.Label, pathRoot+"/mystations", len(s.store.Snapshot())))
+			}
 		case "bookmarks":
 			if s.bookmarks {
 				p.Add(s.dir(mi.Label, pathRoot+"/bookmark", 0))
@@ -135,9 +153,19 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	s.page(w, p)
 }
 
+// station answers a lookup by id. Ids shorter than three characters, unknown
+// ids and prefixes not ported yet all end in "No station(s) found" - the
+// Pascal build once left such a request hanging until the receiver timed out.
 func (s *Server) station(w http.ResponseWriter, r *http.Request) {
-	// Ids are resolved in later stages; every id is currently "not found",
-	// which is what the Pascal build answers for an unknown or malformed id.
+	id := r.URL.Query().Get("id")
+	if len(id) >= 3 && id[2] == '_' && id[:2] == stations.Prefix {
+		if cat, st, ok := s.store.ByID(id); ok {
+			p := &vtuner.Page{TotalItemsCount: 1}
+			p.Add(s.vtunerStation(cat, st, r))
+			s.page(w, p)
+			return
+		}
+	}
 	s.display(w, msgNoStations)
 }
 
@@ -234,4 +262,152 @@ func itoa(n int) string {
 		n /= 10
 	}
 	return string(b[i:])
+}
+
+// httpDecode is HTTPDecode from fphttp: '+' is a space, %XX is a byte.
+func httpDecode(s string) string {
+	s = strings.ReplaceAll(s, "+", " ")
+	if d, err := url.PathUnescape(s); err == nil {
+		return d
+	}
+	return s
+}
+
+// urlEncode is URLEncode in common.pas: every byte that is not an ASCII letter
+// becomes %XX - digits, dots and dashes included.
+func urlEncode(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') {
+			b.WriteByte(c)
+		} else {
+			b.WriteString("%" + strings.ToUpper(hex2(c)))
+		}
+	}
+	return b.String()
+}
+
+func hex2(c byte) string {
+	const d = "0123456789ABCDEF"
+	return string([]byte{d[c>>4], d[c&15]})
+}
+
+// pageRange is GetPageRange in httpserver.pas, indices zero-based inclusive.
+// Receivers page with start/howmany or startitems/enditems.
+func pageRange(q url.Values, n int) (first, last int) {
+	atoi := func(k string) (int, bool) { v, err := strconv.Atoi(q.Get(k)); return v, err == nil }
+	if st, ok := atoi("start"); ok {
+		if hm, ok2 := atoi("howmany"); ok2 {
+			first, last = st, st+hm-1
+			goto done
+		}
+	}
+	first, _ = atoi("startitems")
+	last, _ = atoi("enditems")
+	if last < first {
+		last = first
+	}
+done:
+	first--
+	last--
+	if first < 0 {
+		first = 0
+	}
+	if last > n-1 {
+		last = n - 1
+	} else if last < 0 {
+		last = n - 1 // issue coffeegreg/YTuner#28: a missing end means "to the end"
+	}
+	return
+}
+
+func (s *Server) stripHTTPS(u string) string {
+	// Protocol=all-as-http is the shipped default of avr.ini; with a common avr.ini
+	// (CommonAVRini=1, the default) it applies to every receiver.
+	if s.avr.AllAsHTTP {
+		for _, p := range []string{"https://", "HTTPS://", "Https://"} {
+			if strings.HasPrefix(strings.ToLower(u), strings.ToLower(p)) {
+				return "http://" + u[len(p):]
+			}
+		}
+	}
+	return u
+}
+
+func (s *Server) vtunerStation(cat string, st stations.Station, r *http.Request) vtuner.Station {
+	return vtuner.Station{
+		UID: st.ID, Name: st.Name,
+		Description: "My favorite \"" + st.Name + "\"",
+		URL:         s.stripHTTPS(st.URL),
+		Icon:        "http://" + s.urlHost + "/" + pathRoot + "/icon?id=" + st.ID,
+		Genre:       cat,
+		Bookmark:    "http://" + s.urlHost + "/setupapp/favxml.asp?id=" + st.ID + "&fav=add",
+	}
+}
+
+func (s *Server) myStations(w http.ResponseWriter, r *http.Request) {
+	g := s.store.Snapshot()
+	if len(g) == 0 {
+		s.display(w, msgNoStations)
+		return
+	}
+	first, last := pageRange(r.URL.Query(), len(g))
+	p := &vtuner.Page{TotalItemsCount: len(g)}
+	for i := first; i <= last && i < len(g); i++ {
+		p.Add(s.dir(g[i].Name, pathRoot+"/mystations/"+urlEncode(g[i].Name), len(g[i].Stations)))
+	}
+	s.page(w, p)
+}
+
+func (s *Server) myStationsOfCategory(w http.ResponseWriter, r *http.Request, cat string) {
+	g := s.store.Snapshot()
+	if len(g) == 0 {
+		s.display(w, msgNoStations)
+		return
+	}
+	for _, c := range g {
+		if !strings.EqualFold(c.Name, cat) {
+			continue
+		}
+		if len(c.Stations) == 0 {
+			break
+		}
+		first, last := pageRange(r.URL.Query(), len(c.Stations))
+		p := &vtuner.Page{TotalItemsCount: len(c.Stations)}
+		for i := first; i <= last && i < len(c.Stations); i++ {
+			// Genre carries the category as the receiver spelled it in the URL, not as
+			// stored (the Pascal handler reuses the request value), so match that.
+			p.Add(s.vtunerStation(cat, c.Stations[i], r))
+		}
+		s.page(w, p)
+		return
+	}
+	s.display(w, msgNoStations+" : "+cat)
+}
+
+// play redirects a receiver to the station's stream. Playlist resolution
+// (ResolvePlaylists) and the other id prefixes arrive with their own stages.
+func (s *Server) play(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	target := ""
+	if len(id) >= 2 && id[:2] == stations.Prefix {
+		if _, st, ok := s.store.ByID(id); ok {
+			target = s.stripHTTPS(st.URL)
+		}
+	}
+	if target == "" {
+		s.respond(w, http.StatusNotFound, "text/html; charset=utf-8", nil)
+		return
+	}
+	w.Header().Set("Location", target)
+	s.respond(w, redirectCode(s.cfg), "text/html; charset=utf-8", nil)
+}
+
+func redirectCode(c *config.Config) int {
+	n := c.Int("Configuration", "RedirectHTTPCode", 302)
+	if n < 300 || n > 399 {
+		return 302
+	}
+	return n
 }

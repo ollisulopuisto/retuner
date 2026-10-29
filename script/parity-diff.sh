@@ -19,6 +19,21 @@ trap cleanup EXIT INT TERM
 start() { # $1=name $2=bin $3=port
   mkdir -p "$WORK/$1"
   cp "$2" "$WORK/$1/retuner"
+  mkdir -p "$WORK/$1/config"
+  cat > "$WORK/$1/config/stations.ini" <<'EOS'
+[Jazz & Blues]
+Radio One=http://one.example/stream|http://one.example/logo.png
+Secure Two=https://two.example/s?a=1&b=2
+no equals here
+Third=http://three.example/x|
+
+[Rock 2000s]
+Äänekoski FM=http://fm.example/a.mp3|http://fm.example/l.jpg
+Dup=http://d.example/x
+Dup=http://d.example/x
+
+[Empty One]
+EOS
   cat > "$WORK/$1/retuner.ini" <<EOT
 [Configuration]
 INIVersion=1.2.2
@@ -31,7 +46,7 @@ Enable=0
 [RadioBrowser]
 Enable=0
 [MyStations]
-Enable=0
+Enable=1
 [Bookmark]
 Enable=1
 EOT
@@ -71,6 +86,18 @@ done <<'EOU'
 /retuner/empty
 /ytuner/empty
 /setupapp/x/statxml.asp?id=x
+/retuner/mystations?mac=aabbccddee
+/retuner/mystations?start=1&howmany=1
+/retuner/mystations?startitems=2&enditems=3
+/retuner/mystations?startitems=9&enditems=2
+/retuner/mystations/Jazz%20%26%20Blues
+/retuner/mystations/jazz+%26+blues
+/retuner/mystations/Rock%202000s?start=2&howmany=5
+/retuner/mystations/Empty%20One
+/retuner/mystations/Nothing
+/ytuner/mystations/Jazz%20%26%20Blues
+/retuner/play?id=MS_NOTREAL
+/retuner/play
 /setupapp/x/statxml.asp?id=
 /setupapp/x/statxml.asp
 /setupapp/favxml.asp
