@@ -40,7 +40,7 @@ type Store struct {
 	mu      sync.Mutex
 }
 
-var safeMAC = regexp.MustCompile(`^[A-Za-z0-9_-]{1,32}$`)
+var safeMAC = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 
 // path names the favourites file. A MAC is only trusted as a file name when it
 // is plain; the Pascal build used it unchecked, so "../x" wrote outside config/.

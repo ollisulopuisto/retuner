@@ -60,3 +60,29 @@ func TestUnsafeMACNeverEscapesConfigDir(t *testing.T) {
 		t.Fatal(p)
 	}
 }
+
+// Pascal's IsSafeAVRMAC accepts 1..64 of [A-Za-z0-9_-]; a Denon sends 32 hex.
+// Those must keep their own file, and anything else must stay inside Dir.
+func TestPerMACFileNames(t *testing.T) {
+	s := &Store{Dir: t.TempDir(), Limit: 5, URLHost: "10.0.0.5"}
+	hex32 := strings.Repeat("ab", 16)
+	long64 := strings.Repeat("c", 64)
+	for _, mac := range []string{hex32, long64, "../../evil", "aa:bb", strings.Repeat("d", 65)} {
+		s.Set(mac, "add", item("MSB1"))
+	}
+	for _, want := range []string{hex32 + ".xml", long64 + ".xml"} {
+		if _, err := os.Stat(filepath.Join(s.Dir, want)); err != nil {
+			t.Errorf("missing %s", want)
+		}
+	}
+	ents, _ := os.ReadDir(s.Dir)
+	for _, e := range ents {
+		t.Log(e.Name())
+	}
+	if _, err := os.Stat(filepath.Join(s.Dir, "bookmark.xml")); err != nil {
+		t.Error("unsafe MACs should share bookmark.xml")
+	}
+	if _, err := os.Stat(filepath.Join(s.Dir, "..", "evil.xml")); err == nil {
+		t.Error("escaped Dir")
+	}
+}
