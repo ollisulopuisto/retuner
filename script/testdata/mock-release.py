@@ -69,7 +69,13 @@ def assets():
         full = os.path.join(ASSET_DIR, name)
         if os.path.islink(full) or not os.path.isfile(full):
             continue
-        with open(full, "rb") as f:
+        # O_NOFOLLOW: a file swapped for a symlink between the listing and
+        # this open is refused instead of followed (test server, local use).
+        try:
+            fd = os.open(full, os.O_RDONLY | os.O_NOFOLLOW)
+        except OSError:
+            continue
+        with os.fdopen(fd, "rb") as f:
             result[name] = f.read()
     return result
 
@@ -135,6 +141,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if body is None:
                 self._send(404, "no such asset", "text/plain")
                 return
+
             self.send_response(200)
             self.send_header("Content-Type", "application/gzip")
             self.send_header("Content-Length", str(len(body)))
