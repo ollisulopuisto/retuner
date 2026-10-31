@@ -342,7 +342,10 @@ func (c *Config) LoadAVRFile(name string) (*AVR, error) {
 		return nil, err
 	}
 	p := filepath.Join(dir, name)
-	f := ini.Empty()
+	// IgnoreInlineComment: Pascal's TIniFile neither strips inline comments
+	// on read nor quotes values on write; without this, go-ini wraps values
+	// containing ';' or '#' in backticks that Pascal never writes.
+	f := ini.Empty(ini.LoadOptions{IgnoreInlineComment: true})
 	comments := map[string]string{}
 	if b, err := os.ReadFile(p); err == nil {
 		var err2 error
