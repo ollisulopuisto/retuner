@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"retuner/internal/playlist"
@@ -24,7 +25,15 @@ const (
 	reconnectAttempts = 5
 	reconnectPause    = 2 * time.Second
 	initialAttempts   = 2
+	relayBufferSize   = 16 * 1024
 )
+
+var bufferPool = sync.Pool{
+	New: func() any {
+		b := make([]byte, relayBufferSize)
+		return &b
+	},
+}
 
 type Server struct {
 	Resolve   func(id string) string // station id -> stream URL, "" when unknown
@@ -36,6 +45,29 @@ type Server struct {
 	// one, which verifies TLS certificates against the system roots.
 	Transport http.RoundTripper
 	ln        net.Listener
+
+	clientOnce sync.Once
+	client     *http.Client
+}
+
+func (s *Server) getClient() *http.Client {
+	s.clientOnce.Do(func() {
+		rt := s.Transport
+		if rt == nil {
+			rt = &http.Transport{
+				DialContext: (&net.Dialer{
+					Timeout:   10 * time.Second,
+					KeepAlive: 30 * time.Second,
+				}).DialContext,
+				ResponseHeaderTimeout: 10 * time.Second,
+				MaxIdleConns:          50,
+				MaxIdleConnsPerHost:   10,
+				IdleConnTimeout:       90 * time.Second,
+			}
+		}
+		s.client = &http.Client{Transport: rt}
+	})
+	return s.client
 }
 
 // NeedsRelay: only https URLs, and only when RelayHTTPS is on (callers check that).
@@ -141,8 +173,18 @@ func (f *forward) Write(p []byte) (int, error) {
 
 func (s *Server) serve(c net.Conn) {
 	defer c.Close()
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("%s: panic recovered in serve: %v", service, r)
+		}
+	}()
+	if tc, ok := c.(*net.TCPConn); ok {
+		_ = tc.SetNoDelay(true)
+	}
+	_ = c.SetReadDeadline(time.Now().Add(10 * time.Second))
 	br := bufio.NewReader(c)
 	line, wantIcy := readRequest(br)
+	_ = c.SetReadDeadline(time.Time{})
 	id := RequestedID(line)
 	if id == "" || s.Resolve == nil {
 		s.status(c, "404 Not Found")
@@ -164,11 +206,10 @@ func (s *Server) serve(c net.Conn) {
 		pause = reconnectPause
 	}
 	attempts, limit := 0, initialAttempts
-	var rt http.RoundTripper = &http.Transport{DialContext: (&net.Dialer{Timeout: 10 * time.Second}).DialContext, ResponseHeaderTimeout: 10 * time.Second}
-	if s.Transport != nil {
-		rt = s.Transport
-	}
-	client := &http.Client{Transport: rt}
+	client := s.getClient()
+	bufPtr := bufferPool.Get().(*[]byte)
+	defer bufferPool.Put(bufPtr)
+	buf := *bufPtr
 	for {
 		before := f.bytes
 		req, err := http.NewRequest("GET", u, nil)
@@ -180,11 +221,18 @@ func (s *Server) serve(c net.Conn) {
 			var resp *http.Response
 			if resp, err = client.Do(req); err == nil {
 				if resp.StatusCode == 200 {
+					// Validate icy-metaint header: if malformed (non-positive integer), ignore it
+					if mi := resp.Header.Get("icy-metaint"); mi != "" {
+						if n, perr := strconv.Atoi(strings.TrimSpace(mi)); perr != nil || n <= 0 {
+							resp.Header.Del("icy-metaint")
+						}
+					}
 					f.resp = resp
-					_, err = io.Copy(f, resp.Body)
+					_, err = io.CopyBuffer(f, resp.Body, buf)
 				} else {
 					err = io.ErrUnexpectedEOF
 				}
+				io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
 				resp.Body.Close()
 				f.resp = nil
 			}
