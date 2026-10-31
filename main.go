@@ -82,7 +82,9 @@ func main() {
 				rb.DB = db
 				if ttl := cfg.Int("RadioBrowser", "RBCacheTTL", 0); ttl > 0 {
 					go func() {
-						for range time.Tick(time.Duration(ttl) * time.Hour) {
+						ticker := time.NewTicker(time.Duration(ttl) * time.Hour)
+						defer ticker.Stop()
+						for range ticker.C {
 							if err := db.Refresh(); err != nil {
 								log.Printf("Radio Browser database refresh failed, keeping the old one: %v", err)
 							}
@@ -131,7 +133,9 @@ func main() {
 		if mins := cfg.Int("MyStations", "MyStationsAutoRefreshPeriod", 0); mins > 0 {
 			go func() {
 				last := fileSum(store.Own)
-				for range time.Tick(time.Duration(mins) * time.Minute) {
+				ticker := time.NewTicker(time.Duration(mins) * time.Minute)
+				defer ticker.Stop()
+				for range ticker.C {
 					if sum := fileSum(store.Own); sum != last {
 						log.Printf("\"My Stations\" file has been changed. Refreshing..")
 						reload()
@@ -142,7 +146,9 @@ func main() {
 		}
 		if mins := cfg.Int("Presets", "PresetsAutoRefreshPeriod", 0); pre.Enabled && mins > 0 {
 			go func() {
-				for range time.Tick(time.Duration(mins) * time.Minute) {
+				ticker := time.NewTicker(time.Duration(mins) * time.Minute)
+				defer ticker.Stop()
+				for range ticker.C {
 					pre.Refresh()
 					reload()
 				}

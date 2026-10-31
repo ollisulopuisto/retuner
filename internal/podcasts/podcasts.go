@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -45,9 +46,32 @@ type Store struct {
 	UserAgent string
 	Client    *http.Client
 
-	mu    sync.Mutex
-	feeds []Feed
-	cache []cacheEntry
+	clientOnce sync.Once
+	mu         sync.Mutex
+	feeds      []Feed
+	cache      []cacheEntry
+}
+
+func (s *Store) getClient() *http.Client {
+	if s.Client != nil {
+		return s.Client
+	}
+	s.clientOnce.Do(func() {
+		s.Client = &http.Client{
+			Timeout: 15 * time.Second,
+			Transport: &http.Transport{
+				DialContext: (&net.Dialer{
+					Timeout:   10 * time.Second,
+					KeepAlive: 30 * time.Second,
+				}).DialContext,
+				ResponseHeaderTimeout: 10 * time.Second,
+				MaxIdleConns:          50,
+				MaxIdleConnsPerHost:   10,
+				IdleConnTimeout:       90 * time.Second,
+			},
+		}
+	})
+	return s.Client
 }
 
 func ID(prefix, text string) string {
@@ -283,10 +307,7 @@ func (s *Store) parseFeed(b []byte) []Episode {
 }
 
 func (s *Store) fetch(u string) []byte {
-	c := s.Client
-	if c == nil {
-		c = &http.Client{Timeout: 15 * time.Second}
-	}
+	c := s.getClient()
 	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
 		return nil
