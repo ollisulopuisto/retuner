@@ -19,10 +19,9 @@ import (
 // station twelve length-prefixed (uint16) strings, per category one such
 // string and an int32 count; all little endian.
 //
-// The category files are named exactly as Pascal names them. The station
-// files carry a hash of the category or search text, and Pascal's is
-// string.GetHashCode (not reproduced), so Go uses its own hash there: the
-// formats are shared, those file names are not.
+// Category and station files are named exactly as Pascal names them; the
+// station file name hash reproduces FreePascal's string.GetHashCode (see
+// hash in radiobrowser.go), so Go and Pascal share the whole cache folder.
 
 func (c *Client) fileMode() bool { return c.CacheType == "catFile" && c.CacheDir != "" }
 

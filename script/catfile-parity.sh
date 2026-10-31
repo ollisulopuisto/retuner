@@ -1,9 +1,10 @@
 #!/bin/sh
-# catFile on-disk cache: (1) the files each binary writes have identical bytes
-# (names too for the category files); (2) after a restart the cache answers
-# without upstream requests; (3) the other binary reads the first one's
-# category files without upstream requests; (4) a TTL of 1 hour with files
-# older than that forces a refetch, in both.
+# catFile on-disk cache: (1) the files each binary writes are identical,
+# names and bytes, category and station lists alike (the station file name
+# hash matches Pascal's string.GetHashCode); (2) after a restart the cache
+# answers without upstream requests; (3) the other binary reads the first
+# one's whole cache without upstream requests; (4) a TTL of 1 hour with
+# files older than that forces a refetch, in both.
 #   ./script/catfile-parity.sh <reference-binary> <go-binary>
 set -eu
 REF=${1:?reference}; NEW=${2:?go binary}
@@ -46,7 +47,7 @@ session() { # dir logname -> runs the binary in dir, requests URLS, stops; leave
   kill $bp $mp 2>/dev/null || true; wait $bp $mp 2>/dev/null || true; sleep 0.3
   grep -c . "$W/$2.rblog" > "$W/count" || echo 0 > "$W/count"
 }
-sums() { ( cd "$1/cache" && for f in RB*.cache; do echo "$(md5sum < "$f" | cut -c1-32) $(wc -c < "$f")"; done | sort ); }
+sums() { ( cd "$1/cache" && for f in RB*.cache; do echo "$(wc -c < "$f") $f"; done | sort ); }
 fail=0
 chk() { if [ "$2" = "$3" ]; then echo "  same  $1 ($2)"; else echo "  DIFF  $1: ref=$2 new=$3"; fail=1; fi; }
 for n in ref new; do
@@ -58,14 +59,14 @@ done
 chk "upstream requests on first run" "$c1_ref" "$c1_new"
 chk "upstream requests after restart (cache reused)" "$c2_ref" "$c2_new"
 [ "$c2_new" = 0 ] || { echo "  FAIL  Go refetched after restart"; fail=1; }
-chk "cache file contents (md5, size)" "$(sums $W/ref | tr '\n' ,)" "$(sums $W/new | tr '\n' ,)"
+chk "cache files (name and size)" "$(sums $W/ref | tr '\n' ,)" "$(sums $W/new | tr '\n' ,)"
 cmp -s "$W/ref-1.pages" "$W/new-1.pages" && echo "  same  pages served" || { echo "  DIFF  pages served"; fail=1; }
 # cross reads: Go over Pascal's cache folder and Pascal over Go's
 for pair in "ref new" "new ref"; do set -- $pair
   d="$W/x-$1-$2"; bin=$NEW; [ $2 = ref ] && bin=$REF
   mkdir -p "$d/cache"; cp "$W/$1/cache/"*.cache "$d/cache/"; setup "$d" "$bin" 0
   session "$d" "x-$1-$2"
-  echo "  info  $2 reading $1's cache files: $(cat $W/count) upstream requests of $(echo $URLS | wc -w) pages (station files need the same name hash, so only the category files are shared)"
+  chk "$2 reading $1's cache files (whole cache shared)" "$(cat $W/count)" 0
 done
 # TTL: files 3 hours old, TTL 1 hour
 for n in ref new; do

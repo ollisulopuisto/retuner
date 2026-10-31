@@ -11,7 +11,6 @@ package radiobrowser
 import (
 	"encoding/json"
 	"fmt"
-	"hash/fnv"
 	"io"
 	"log"
 	"net/http"
@@ -313,10 +312,26 @@ func stationAllowed(m map[string]any, k Kind, a *config.AVR) bool {
 	return true
 }
 
+// hash names a station-list cache entry exactly as Pascal does:
+// Abs(AName.ToLower.GetHashCode) in src/radiobrowser.pas. FreePascal's
+// TStringHelper.GetHashCode is h = h*31 xor c over the string's characters
+// with 32-bit wraparound (rtl/objpas/sysutils/syshelps.inc), and its
+// AnsiString ToLower folds ASCII only, so this runs on the raw bytes.
+// Abs of the minimum int32 keeps its sign in Pascal (range checks off),
+// which the == -1<<31 case reproduces.
 func hash(s string) string {
-	h := fnv.New32a()
-	h.Write([]byte(strings.ToLower(s)))
-	return strconv.Itoa(int(h.Sum32()))
+	var h int32
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		h = int32(uint32(h)*31 ^ uint32(c))
+	}
+	if h < 0 && h != -1<<31 {
+		h = -h
+	}
+	return strconv.Itoa(int(h))
 }
 
 func (c *Client) lookup(key string) (cached, bool) {
