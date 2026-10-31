@@ -3,12 +3,14 @@
 # placeholder fallback (feed without logo, unknown id), the bad-id 404, HEAD,
 # and the icon cache (the feed mock's request log proves refetch behaviour).
 #
-# Bodies are NOT compared byte for byte, and this is deliberate: the Pascal
-# 26.08.28.4 build re-encodes icons with FPC's JPEG writer, whose output is
-# defective - Go's image/jpeg and ffmpeg both reject or fail most of the scan
-# (ffmpeg: 66 errors; only the top MCU rows decode), and Pascal appends a
-# stray LF after EOI. The Go port serves a valid JPEG of the same mark at the
-# same size. Compared instead: status lines, all headers except Connection
+# Bodies are NOT compared byte for byte, and this is deliberate: the icon
+# JPEGs the Pascal 26.08.28.4 release binary serves are defective as observed
+# on the wire - Go's image/jpeg rejects the stream, ffmpeg decodes only the
+# top MCU rows then reports 66 errors, and a stray LF follows EOI (root cause
+# inside its re-encode pipeline not isolated; whether real receivers show
+# damage is untested). The Go port serves a valid JPEG of the same mark at
+# the same size. Reproduce: request /retuner/icon?id=<any unknown id> from
+# the release binary and decode the body with ffmpeg or Go's image/jpeg. Compared instead: status lines, all headers except Connection
 # (Go closes icon responses explicitly for curl -X HEAD; Pascal closes
 # silently) and Content-Length, the image format and pixel dimensions, and
 # the mock's request counts.
@@ -91,5 +93,5 @@ note() { echo "  $1"; }
 if cmp -s "$W/out-ref/all" "$W/out-new/all"; then note "same  statuses and headers (Connection/Content-Length excepted)"; else note "DIFF  statuses/headers"; diff "$W/out-ref/all" "$W/out-new/all" | head -20; fail=1; fi
 if cmp -s "$W/out-ref/dims" "$W/out-new/dims"; then note "same  image format and dimensions ($(head -1 "$W/out-new/dims"))"; else note "DIFF  image format/dimensions"; diff "$W/out-ref/dims" "$W/out-new/dims"; fail=1; fi
 if cmp -s "$W/out-ref/log" "$W/out-new/log"; then note "same  requests seen by the feed mock"; sed 's/^/        /' "$W/out-new/log"; else note "DIFF  mock requests"; diff "$W/out-ref/log" "$W/out-new/log" | head; fail=1; fi
-note "info  body bytes differ by design: Pascal 26.08.28.4's JPEG writer emits a defective stream (ref $(stat -c%s "$W/out-ref/b-plain")B vs go $(stat -c%s "$W/out-new/b-plain")B); see header comment"
+note "info  body bytes differ by design: Pascal 26.08.28.4's served icon JPEG is defective (ref $(stat -c%s "$W/out-ref/b-plain")B vs go $(stat -c%s "$W/out-new/b-plain")B); see header comment"
 [ $fail -eq 0 ] && echo "All compared responses match (bodies excepted, see header)." || { echo "Differences found."; exit 1; }
