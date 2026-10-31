@@ -3,14 +3,26 @@ name: build
 on:
   push:
     branches:
-      - '**'
+      - master
   pull_request:
     branches:
       - master
+  # A check-only run of the whole matrix, from the Actions tab, for a branch
+  # with no PR.
+  workflow_dispatch:
+
+# A push supersedes the run before it.
+concurrency:
+  group: binaries-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     name: ${{ matrix.os }} ${{ matrix.arch }}
+    # Queue time does not count towards this, only running time. The suites
+    # take minutes; the default limit is six hours, which is what a hung
+    # server used to burn.
+    timeout-minutes: 25
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -24,7 +36,7 @@ jobs:
             runner: ubuntu-24.04-arm
           - os: darwin
             arch: amd64
-            runner: macos-13
+            runner: macos-15-intel
           - os: darwin
             arch: arm64
             runner: macos-latest
