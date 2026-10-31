@@ -44,22 +44,25 @@ var safeMAC = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 
 // path names the favourites file. A MAC is only trusted as a file name when it
 // is plain; the Pascal build used it unchecked, so "../x" wrote outside config/.
+// filepath.IsLocal additionally rejects absolute paths and any ".." element, so
+// the file name handed to filepath.Join is provably a single local component.
 func (s *Store) path(mac string) string {
-	if s.Common || !safeMAC.MatchString(mac) {
-		mac = "bookmark"
+	fallback := filepath.Join(s.Dir, "bookmark.xml")
+	if !s.Common && safeMAC.MatchString(mac) {
+		name := mac + ".xml"
+		if filepath.IsLocal(name) {
+			candidate := filepath.Join(s.Dir, name)
+			baseAbs, err1 := filepath.Abs(s.Dir)
+			candidateAbs, err2 := filepath.Abs(candidate)
+			if err1 == nil && err2 == nil {
+				rel, err := filepath.Rel(baseAbs, candidateAbs)
+				if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel) {
+					return candidateAbs
+				}
+			}
+		}
 	}
-
-	candidate := filepath.Join(s.Dir, mac+".xml")
-	baseAbs, err1 := filepath.Abs(s.Dir)
-	candidateAbs, err2 := filepath.Abs(candidate)
-	if err1 != nil || err2 != nil {
-		return filepath.Join(s.Dir, "bookmark.xml")
-	}
-	rel, err := filepath.Rel(baseAbs, candidateAbs)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
-		return filepath.Join(s.Dir, "bookmark.xml")
-	}
-	return candidateAbs
+	return fallback
 }
 
 type xmlItem struct {

@@ -50,7 +50,7 @@ type DB struct {
 	ttl     time.Duration
 	db      *sql.DB
 	created time.Time
-	views   map[string]bool
+	views   map[string]string
 }
 
 func openDB(dsn string) (*sql.DB, error) {
@@ -81,7 +81,7 @@ func (b *DB) fileFresh(path string) bool {
 // as the Pascal build does at start-up. An error means the cache type cannot be
 // served; the caller must not fall back to live API traffic silently.
 func (c *Client) PrepareDB(dir string, cacheType string, ttlHours int) (*DB, error) {
-	b := &DB{c: c, typ: cacheType, dir: dir, ttl: time.Duration(ttlHours) * time.Hour, views: map[string]bool{}}
+	b := &DB{c: c, typ: cacheType, dir: dir, ttl: time.Duration(ttlHours) * time.Hour, views: map[string]string{}}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("cannot create database directory %s: %w", dir, err)
 	}
@@ -246,7 +246,7 @@ func (b *DB) build() error {
 		}
 	}
 	old := b.db
-	b.db, b.created, b.views = d, time.Now(), map[string]bool{}
+	b.db, b.created, b.views = d, time.Now(), map[string]string{}
 	if old != nil && old != d {
 		old.Close()
 	}
@@ -339,8 +339,8 @@ func (b *DB) ensureView(mac string, a *config.AVR) (string, error) {
 	if !isSafeSQLIdent(name) {
 		return "", fmt.Errorf("invalid view name")
 	}
-	if b.views[name] {
-		return name, nil
+	if cn, ok := b.views[name]; ok {
+		return cn, nil
 	}
 	rows, err := b.db.Query(script("RBDB_SQL_LIST_VIEWS"))
 	if err != nil {
@@ -390,8 +390,37 @@ func (b *DB) ensureView(mac string, a *config.AVR) (string, error) {
 	if _, err := b.db.Exec(text()); err != nil {
 		return "", fmt.Errorf("create view: %w", err)
 	}
-	b.views[name] = true
-	return name, nil
+	cn, err := b.confirmedViewName(name)
+	if err != nil {
+		return "", err
+	}
+	b.views[name] = cn
+	return cn, nil
+}
+
+// confirmedViewName resolves a candidate view name against the database
+// catalogue and returns the name as SQLite stores it. SELECT statements splice
+// the result into their text because SQLite cannot bind identifiers, so that
+// string must originate from the database itself, never from request input.
+func (b *DB) confirmedViewName(name string) (string, error) {
+	if !isSafeSQLIdent(name) {
+		return "", fmt.Errorf("invalid view name")
+	}
+	rows, err := b.db.Query(script("RBDB_SQL_LIST_VIEWS"))
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var v string
+		if err := rows.Scan(&v); err != nil {
+			return "", err
+		}
+		if v == name {
+			return v, nil
+		}
+	}
+	return "", fmt.Errorf("radio-browser view missing after creation")
 }
 
 const filterStripChars = "!\"'():@&=+$,/?%#[]-.~\n\r\t"
