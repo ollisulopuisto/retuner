@@ -103,8 +103,12 @@ func (s *Store) read(mac string) (*file, bool, error) {
 	return f, true, nil
 }
 
+// xmlEscaper replaces XML entities matching FPC's WriteXML escaping behavior.
+// Reusing a single replacer instance avoids allocating a new replacer trie on every field.
+var xmlEscaper = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
+
 func esc(s string) string {
-	return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace(s)
+	return xmlEscaper.Replace(s)
 }
 
 func el(b *bytes.Buffer, name, val string, selfClose bool) {

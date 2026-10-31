@@ -42,3 +42,27 @@ func TestDirectoryAddsRetunerParameter(t *testing.T) {
 		t.Fatal(p.XML())
 	}
 }
+
+func BenchmarkPageXML(b *testing.B) {
+	p := &Page{TotalItemsCount: 100}
+	for i := 0; i < 100; i++ {
+		p.Add(Station{
+			UID:         "MS_12345678",
+			Name:        "Rock & Roll <Live>",
+			Description: "The best classic & modern rock station in the world",
+			URL:         "http://stream.example.com/live?id=1&token=xyz",
+			Icon:        "http://retuner/icon/123",
+			Genre:       "Rock",
+			Location:    "New York, USA",
+			Mime:        "mp3",
+			Bitrate:     "320",
+			Bookmark:    "http://retuner/fav?id=123",
+		})
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = p.XML()
+	}
+}
