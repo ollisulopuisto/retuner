@@ -719,16 +719,43 @@ func (s *Server) favorite(w http.ResponseWriter, r *http.Request) {
 		s.respond(w, http.StatusBadRequest, "text/html; charset=utf-8", nil)
 		return
 	}
-	if len(id) >= 3 && id[:2] == stations.Prefix {
+	// Resolve the station info exactly as statxml does, for every source
+	// Pascal's GetStationInfo knows: my stations, podcast episodes, radio
+	// browser. Only the lookup differs; the stored item is the same shape.
+	var vs vtuner.Station
+	found := false
+	switch {
+	case len(id) >= 3 && id[:2] == stations.Prefix:
 		if cat, st, ok := s.store.ByID(id); ok {
-			vs := s.vtunerStation(cat, st, r)
-			it := bookmark.Item{ID: strings.Replace(vs.UID, "_", "B", 1), Name: vs.Name, URL: vs.URL, Desc: vs.Description,
-				Logo: vs.Icon, Format: vs.Genre, Location: vs.Location, Bandwidth: vs.Bitrate, Mime: "", Relia: "3", Bookmark: vs.Bookmark}
-			s.bm.Set(mac, fav, it)
-			w.Header().Set("Content-Type", "text/html")
-			w.WriteHeader(http.StatusOK)
-			return
+			vs, found = s.vtunerStation(cat, st, r), true
 		}
+	case len(id) >= 3 && id[:2] == podcasts.Prefix:
+		if e, ok := s.pod.EpisodeByID(id); ok {
+			vs, found = s.podStation(e, e.Description, r), true
+		}
+	case len(id) >= 3 && strings.HasPrefix(id, "RB_") && s.rb != nil:
+		if st, ok := s.rbByID(id, r); ok && st.ID != "" {
+			vs, found = s.rbStation(st, "", r), true
+		}
+	}
+	if found {
+		it := bookmark.Item{ID: strings.Replace(vs.UID, "_", "B", 1), Name: vs.Name, URL: vs.URL, Desc: vs.Description,
+			Logo: vs.Icon, Format: vs.Genre, Location: vs.Location, Bandwidth: vs.Bitrate, Mime: "", Relia: "3", Bookmark: vs.Bookmark}
+		s.bm.Set(mac, fav, it)
+		// Pascal's wire answer here is exactly "200 OK / Status / Content-Type:
+		// text/html" and a closed connection - no Content-Length, no Server,
+		// no Date. net/http would add Content-Length: 0, so write it raw.
+		if hj, ok := w.(http.Hijacker); ok {
+			if conn, rw, err := hj.Hijack(); err == nil {
+				_, _ = rw.WriteString("HTTP/1.1 200 OK\r\nStatus: 200 OK\r\nContent-Type: text/html\r\n\r\n")
+				_ = rw.Flush()
+				_ = conn.Close()
+				return
+			}
+		}
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusOK)
+		return
 	}
 	s.display(w, msgNoStations)
 }
