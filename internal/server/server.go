@@ -328,7 +328,9 @@ func (s *Server) icon(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if !safeIconKey.MatchString(id) {
 		log.Printf("Icon id refused, it is not an id")
-		s.respond(w, http.StatusNotFound, "", nil)
+		// Pascal answers ctNone here, which its response layer renders as
+		// text/html; charset=utf-8 - not an absent Content-Type.
+		s.respond(w, http.StatusNotFound, "text/html; charset=utf-8", nil)
 		return
 	}
 	cacheOn := s.cfg.Int("Configuration", "IconCache", 1) != 0
