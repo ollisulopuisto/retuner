@@ -53,7 +53,7 @@ def station(i, name, url, bitrate, codec):
         "changeuuid": "1111111%d-0000-0000-0000-11111111111%d" % (i, i),
         "stationuuid": "0000000%d-0000-0000-0000-00000000000%d" % (i, i),
         "serveruuid": "2222222%d-0000-0000-0000-22222222222%d" % (i, i),
-        "name": name,
+        "name": name + (" \u00d1andú \u0141ód\u017a \u01c5 \u0191\u00df \u0153 \u00e9\u00e8 caf\u00e9" if os.environ.get("RB_DIAC") else ""),
         "url": url,
         "url_resolved": url,
         "homepage": "http://example.com/",
@@ -105,8 +105,12 @@ class H(BaseHTTPRequestHandler):
             self._send(COUNTRIES)
         elif p.startswith("/json/stations"):
             self._send(STATION_JSON)
-        elif p in ("/json/tags", "/json/languages"):
-            self._send([])
+        elif p == "/json/tags":
+            self._send([{"name": "test", "stationcount": len(STATIONS)}])
+        elif p == "/json/languages":
+            self._send([{"name": "testish", "stationcount": len(STATIONS), "iso_639": "ts"}])
+        elif p == "/json/codecs":
+            self._send([{"name": c, "stationcount": 1} for c in sorted({r[3] for r in STATIONS})])
         elif p == "/json/servers":
             self._send([{"name": "127.0.0.1", "ip": "127.0.0.1"}])
         else:

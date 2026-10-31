@@ -1,0 +1,76 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Retuner remote</title><style>
+:root{--bg:#f6f5f2;--card:#fff;--ink:#1c2530;--soft:#5b6875;--line:#dcd8d0;--accent:#0e7d86;--danger:#b3261e}
+@media(prefers-color-scheme:dark){:root{--bg:#151b21;--card:#1d252d;--ink:#e6ebef;--soft:#a3aeb8;--line:#2d3742;--accent:#3fc1cb;--danger:#ff8a80}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+.wrap{max-width:640px;margin:0 auto;padding:24px 16px 60px}
+h1{font-size:22px;margin:0 0 2px}.sub{color:var(--soft);margin:0 0 18px;font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px;margin-bottom:14px}
+.row{padding:9px 12px;border-radius:6px;font-variant-numeric:tabular-nums;cursor:pointer}
+.row:hover{background:var(--line)}
+.row.cur:hover{background:var(--accent)}
+.row.busy{opacity:.5}
+.row.cur{background:var(--accent);color:#fff;font-weight:600}
+.page{color:var(--soft);font-size:13px;text-align:right;padding:4px 12px}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:280px;margin:0 auto}
+button{font:inherit;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);cursor:pointer}
+button:active{background:var(--accent);color:#fff}
+.wide{grid-column:1/4}
+form{display:flex;gap:8px;margin:0}input{flex:1;font:inherit;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.err{color:var(--danger);font-size:14px;padding:8px 12px}
+</style></head><body id="retuner-remote"><div class="wrap">
+<h1>Retuner remote</h1>
+<p class="sub">The list your receiver is showing. Click a line to go to it; arrow keys and Enter work too.</p>
+<div class="card"><div id="list"></div><div class="page" id="page"></div></div>
+<div class="card"><form id="search" autocomplete="off">
+<input id="q" maxlength="30" placeholder="Search stations by keyword">
+<button type="submit">Search</button></form></div>
+<div class="card"><div class="pad">
+<button data-c="CmdPageUp">Page up</button><button data-c="CurUp">Up</button><button data-c="CmdPageDown">Page down</button>
+<button data-c="CurLeft">Back</button><button data-c="CurEnter">Enter</button><button data-c="CurRight">Fwd</button>
+<button class="wide" data-c="CurDown">Down</button>
+</div></div>
+<div class="err" id="err"></div>
+</div><script>
+var listEl=document.getElementById("list"),pageEl=document.getElementById("page"),errEl=document.getElementById("err");
+function show(e){errEl.textContent=e||"";}
+function draw(d){
+ if(!d.ok){show(d.error||"The receiver did not answer.");return;}
+ show("");
+ listEl.innerHTML="";
+ d.lines.forEach(function(l){
+  var r=document.createElement("div");
+  r.className="row"+(l.cursor?" cur":"");
+  r.textContent=l.text;
+  r.addEventListener("click",function(){select(l.index,r);});
+  listEl.appendChild(r);});
+ pageEl.textContent=d.page||"";}
+function poll(){fetch("api/remote/status",{credentials:"same-origin"})
+ .then(function(r){return r.json();}).then(draw)
+ .catch(function(){show("Cannot reach Retuner.");});}
+function select(i,row){
+ row.classList.add("busy");
+ fetch("api/remote/select",{method:"POST",credentials:"same-origin",
+  headers:{"Content-Type":"application/json"},body:JSON.stringify({index:i})})
+ .then(function(r){return r.json();})
+ .then(function(d){if(!d.ok)show(d.error||"Refused.");setTimeout(poll,500);})
+ .catch(function(){show("Cannot reach Retuner.");});}
+function send(c){fetch("api/remote/cmd",{method:"POST",credentials:"same-origin",
+ headers:{"Content-Type":"application/json"},body:JSON.stringify({cmd:c})})
+ .then(function(r){return r.json();})
+ .then(function(d){if(!d.ok)show(d.error||"Refused.");setTimeout(poll,350);});}
+document.querySelectorAll("button[data-c]").forEach(function(b){
+ b.addEventListener("click",function(){send(b.dataset.c);});});
+document.getElementById("search").addEventListener("submit",function(e){
+ e.preventDefault();var q=document.getElementById("q").value;
+ fetch("api/remote/search",{method:"POST",credentials:"same-origin",
+  headers:{"Content-Type":"application/json"},body:JSON.stringify({q:q})})
+ .then(function(r){return r.json();})
+ .then(function(d){if(!d.ok)show(d.error||"Refused.");setTimeout(poll,600);});});
+var KEYS={ArrowUp:"CurUp",ArrowDown:"CurDown",ArrowLeft:"CurLeft",ArrowRight:"CurRight",Enter:"CurEnter",PageUp:"CmdPageUp",PageDown:"CmdPageDown"};
+document.addEventListener("keydown",function(e){
+ if(e.target.tagName==="INPUT")return;
+ var c=KEYS[e.key];if(c){e.preventDefault();send(c);}});
+poll();setInterval(poll,2000);
+</script></body></html>

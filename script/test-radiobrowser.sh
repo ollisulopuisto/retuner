@@ -65,7 +65,7 @@ start_rb() {
   RB_PIDS="$RB_PIDS $RB_PID"
   i=0
   while [ "$i" -lt 50 ]; do
-    if curl -fsS --noproxy '*' -o /dev/null "http://127.0.0.1:$RB_PORT/json/countries" 2>/dev/null; then
+    if curl -fsS --noproxy '*' --max-time 15 -o /dev/null "http://127.0.0.1:$RB_PORT/json/countries" 2>/dev/null; then
       return 0
     fi
     i=$((i + 1)); sleep 0.2
@@ -147,7 +147,7 @@ start_server() {
   PID=$!
   i=0
   while [ "$i" -lt 60 ]; do
-    if curl -fsS --noproxy '*' -o /dev/null \
+    if curl -fsS --noproxy '*' --max-time 15 -o /dev/null \
          "http://127.0.0.1:$PORT/setupapp/x/loginxml.asp?token=0" 2>/dev/null; then
       return 0
     fi
@@ -165,7 +165,7 @@ stop_server() {
 }
 
 stations() {
-  curl -fsS --noproxy '*' \
+  curl -fsS --noproxy '*' --max-time 15 \
     "http://127.0.0.1:$PORT/retuner/radiobrowser/country/Testland?mac=$MAC" 2>/dev/null || true
 }
 
@@ -320,7 +320,7 @@ stop_server; stop_rb
 echo "- search asks upstream for the most-voted stations first"
 next_ports; start_rb ok; write_config "" "" ""
 start_server "$WORK/run-searchorder.log"
-curl -fsS --noproxy '*' -o /dev/null \
+curl -fsS --noproxy '*' --max-time 15 -o /dev/null \
   "http://127.0.0.1:$PORT/retuner/search?search=yle&mac=$MAC" 2>/dev/null || true
 Q=$(grep '/json/stations/search' "$RB_LOG" 2>/dev/null || true)
 has   "search reaches radio-browser at all"      "$Q" "name=yle"
