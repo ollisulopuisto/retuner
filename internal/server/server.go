@@ -63,10 +63,11 @@ type Server struct {
 	avrMu     sync.Mutex
 	avrs      map[string]*config.AVR
 
-	resolver  *playlist.Resolver
-	pod       *podcasts.Store
-	iconOnce  sync.Once
-	iconBytes []byte
+	resolver   *playlist.Resolver
+	pod        *podcasts.Store
+	iconOnce   sync.Once
+	iconBytes  []byte
+	httpClient *http.Client
 }
 
 func New(cfg *config.Config, avr *config.AVR, urlHost string, store *stations.Store, bm *bookmark.Store, dns *dnsserver.Server, rb *radiobrowser.Client) *Server {
@@ -75,7 +76,20 @@ func New(cfg *config.Config, avr *config.AVR, urlHost string, store *stations.St
 		size = 200
 	}
 	s := &Server{resolver: &playlist.Resolver{UserAgent: "Retuner/" + config.AppVersion}, cfg: cfg, avr: avr, urlHost: urlHost, token: cfg.Str("Configuration", "MyToken"), iconSize: size,
-		placehold: true, bookmarks: cfg.Bool("Bookmark", "Enable"), bm: bm, dns: dns, rb: rb, avrs: map[string]*config.AVR{}, commonAVR: cfg.Int("Configuration", "CommonAVRini", 1) != 0, localCtry: strings.TrimSpace(cfg.Str("Configuration", "LocalCountry")), store: store, mystOn: cfg.Bool("MyStations", "Enable")}
+		placehold: true, bookmarks: cfg.Bool("Bookmark", "Enable"), bm: bm, dns: dns, rb: rb, avrs: map[string]*config.AVR{}, commonAVR: cfg.Int("Configuration", "CommonAVRini", 1) != 0, localCtry: strings.TrimSpace(cfg.Str("Configuration", "LocalCountry")), store: store, mystOn: cfg.Bool("MyStations", "Enable"),
+		httpClient: &http.Client{
+			Timeout: 15 * time.Second,
+			Transport: &http.Transport{
+				DialContext: (&net.Dialer{
+					Timeout:   10 * time.Second,
+					KeepAlive: 30 * time.Second,
+				}).DialContext,
+				ResponseHeaderTimeout: 10 * time.Second,
+				MaxIdleConns:          50,
+				MaxIdleConnsPerHost:   10,
+				IdleConnTimeout:       90 * time.Second,
+			},
+		}}
 	s.pod = &podcasts.Store{File: filepath.Join(cfg.ConfigDir(), cfg.Str("Podcasts", "PodcastsFile")), UserAgent: "Retuner/" + config.AppVersion,
 		Limit: cfg.Int("Podcasts", "PodcastEpisodesLimit", 100), TTL: time.Duration(cfg.Int("Podcasts", "PodcastCacheTTL", 60)) * time.Minute}
 	if s.pod.Limit < 1 {
@@ -378,7 +392,10 @@ func (s *Server) fetchLogo(u string) ([]byte, bool) {
 	}
 	req.Header.Set("Accept", "image/jpeg,image/png,image/gif")
 	req.Header.Set("User-Agent", "Retuner/"+config.AppVersion)
-	cl := &http.Client{Timeout: 15 * time.Second}
+	cl := s.httpClient
+	if cl == nil {
+		cl = &http.Client{Timeout: 15 * time.Second}
+	}
 	resp, err := cl.Do(req)
 	if err != nil {
 		log.Printf("Error getting image from: %q? (%v)", u, err)

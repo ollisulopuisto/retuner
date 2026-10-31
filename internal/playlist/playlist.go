@@ -5,8 +5,10 @@ package playlist
 import (
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -70,13 +72,34 @@ func FirstStream(body string) string {
 type Resolver struct {
 	UserAgent string
 	Client    *http.Client
+
+	clientOnce sync.Once
+}
+
+func (r *Resolver) getClient() *http.Client {
+	if r.Client != nil {
+		return r.Client
+	}
+	r.clientOnce.Do(func() {
+		r.Client = &http.Client{
+			Timeout: 10 * time.Second,
+			Transport: &http.Transport{
+				DialContext: (&net.Dialer{
+					Timeout:   10 * time.Second,
+					KeepAlive: 30 * time.Second,
+				}).DialContext,
+				ResponseHeaderTimeout: 10 * time.Second,
+				MaxIdleConns:          50,
+				MaxIdleConnsPerHost:   10,
+				IdleConnTimeout:       90 * time.Second,
+			},
+		}
+	})
+	return r.Client
 }
 
 func (r *Resolver) fetch(u string) string {
-	c := r.Client
-	if c == nil {
-		c = &http.Client{Timeout: 10 * time.Second}
-	}
+	c := r.getClient()
 	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
 		return ""
