@@ -64,14 +64,28 @@ func parseINI(s string) (Group, int) {
 			cur = len(g) - 1
 			continue
 		}
-		if cur < 0 || t == "" || strings.HasPrefix(t, ";") || strings.HasPrefix(t, "#") {
+		if cur < 0 || t == "" {
 			continue
 		}
 		eq := strings.Index(line, "=")
 		if eq < 0 {
+			// No '=': Pascal drops the line - except a ';' comment, which
+			// FPC's ReadSectionRaw hands back as if it ended in '=', so a
+			// "; ..." line surfaces as a station with an empty URL (a '#'
+			// comment without '=' does not).
+			if !strings.HasPrefix(t, ";") {
+				continue
+			}
+			st := Station{Name: t, URL: ""}
+			st.ID = makeID(st.Name, st.URL)
+			g[cur].Stations = append(g[cur].Stations, st)
+			count++
 			continue
 		}
 		name := strings.TrimSpace(line[:eq])
+		if name == "" {
+			continue
+		}
 		val := line[eq+1:]
 		parts := strings.Split(val, "|")
 		st := Station{Name: name, URL: strings.TrimSpace(parts[0])}

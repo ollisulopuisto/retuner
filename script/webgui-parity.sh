@@ -9,7 +9,7 @@ W=$(mktemp -d); PIDS=""
 trap 'for p in $PIDS; do kill $p 2>/dev/null||true; done; rm -rf "$W"' EXIT INT TERM
 run() { # name bin port
   mkdir -p "$W/$1/config"; cp "$2" "$W/$1/retuner"
-  printf '[Cat A]\nOne=http://e.com/1|http://e.com/l.png\nTwo=http://e.com/2\n[Cat B]\nThree=http://e.com/3\n' > "$W/$1/config/stations.ini"
+  printf '[Cat A]\nOne=http://e.com/1|http://e.com/l.png\nTwo=http://e.com/2\n; a comment the editor round trip cannot keep\n[Cat B]\nThree=http://e.com/3\n' > "$W/$1/config/stations.ini"
   cat > "$W/$1/retuner.ini" <<EOT
 [Configuration]
 INIVersion=1.2.2

@@ -14,12 +14,14 @@ REF=${1:?reference}; NEW=${2:?go binary}
 HERE=$(cd "$(dirname "$0")" && pwd)
 W=$(mktemp -d); PIDS=""
 trap 'for p in $PIDS; do kill $p 2>/dev/null||true; done; rm -rf "$W"' EXIT INT TERM
-M=18848; P=18748
+M=18848; P=18748; M2=18849
 get() { curl -s --noproxy '*' -D - "http://127.0.0.1:$P$1" | grep -iv '^date:\|^server:\|^status:' | tr -d '\r'; echo; }
 phase() { # name bin
   mkdir -p "$W/$1/config"; cp "$2" "$W/$1/retuner"
   python3 "$HERE/testdata/mock-podcasts.py" $M >/dev/null 2>&1 & PIDS="$PIDS $!"
+  python3 "$HERE/testdata/mock-radiobrowser.py" $M2 ok >/dev/null 2>&1 & PIDS="$PIDS $!"
   i=0; until curl -s --noproxy '*' -o /dev/null "http://127.0.0.1:$M/good.xml"; do i=$((i+1)); [ $i -gt 50 ] && exit 1; sleep 0.1; done
+  i=0; until curl -s --noproxy '*' -o /dev/null "http://127.0.0.1:$M2/json/servers"; do i=$((i+1)); [ $i -gt 50 ] && exit 1; sleep 0.1; done
   printf '[News]\nMany=http://127.0.0.1:%s/many.xml\n' $M > "$W/$1/config/podcasts.ini"
   printf '[Lists]\nTest Station=http://127.0.0.1:1/s.mp3\n' > "$W/$1/config/stations.ini"
   cat > "$W/$1/retuner.ini" <<EOT
@@ -27,13 +29,18 @@ phase() { # name bin
 INIVersion=1.2.2
 IPAddress=127.0.0.1
 RelayHTTPS=0
+LocalCountry=Testland
 [WebServer]
 WebServerIPAddress=127.0.0.1
 WebServerPort=$P
 [DNSServer]
 Enable=0
 [RadioBrowser]
-Enable=0
+Enable=1
+RBAPIURL=http://127.0.0.1:$M2
+RBMinStationsPerCategory=1
+RBCacheType=catMemStr
+DBLibFile=default
 [MyStations]
 Enable=1
 [Podcasts]
@@ -48,6 +55,7 @@ EOT
   f=$(curl -s --noproxy '*' "http://127.0.0.1:$P/retuner/podcasts" | grep -o 'PF_[0-9A-F]*' | head -1)
   ep=$(curl -s --noproxy '*' "http://127.0.0.1:$P/retuner/podcasts/$f" | grep -o 'PC_[0-9A-F]*' | head -1)
   ms=$(curl -s --noproxy '*' "http://127.0.0.1:$P/retuner/mystations/Lists" | grep -o 'MS_[0-9A-F]*' | head -1)
+  rb=$(curl -s --noproxy '*' "http://127.0.0.1:$P/retuner/radiobrowser/country/Testland" | grep -o 'RB_[0-9A-F]*' | head -1)
   { echo "== statxml $ep"; get "/setupapp/x/statxml.asp?id=$ep"
     echo "== add ep"; get "/setupapp/favxml.asp?mac=001122334455AABB&id=$ep&fav=add"
     echo "== add ep again"; get "/setupapp/favxml.asp?mac=001122334455AABB&id=$ep&fav=add"
@@ -61,6 +69,11 @@ EOT
     echo "== add ep back"; get "/setupapp/favxml.asp?mac=001122334455AABB&id=$ep&fav=add"
     echo "== list (two items)"; get "/retuner/bookmark"
     echo "== del ms"; get "/setupapp/favxml.asp?mac=001122334455AABB&id=$ms&fav=del"
+    echo "== list (one item)"; get "/retuner/bookmark"
+    echo "== statxml $rb"; get "/setupapp/x/statxml.asp?id=$rb"
+    echo "== add rb"; get "/setupapp/favxml.asp?mac=001122334455AABB&id=$rb&fav=add"
+    echo "== list (two items)"; get "/retuner/bookmark"
+    echo "== del rb"; get "/setupapp/favxml.asp?mac=001122334455AABB&id=$rb&fav=del"
     echo "== list (one item)"; get "/retuner/bookmark"
   } >> "$O/all"
   [ -f "$W/$1/config/bookmark.xml" ] && cp "$W/$1/config/bookmark.xml" "$O/bookmark.xml"

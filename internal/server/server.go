@@ -739,8 +739,10 @@ func (s *Server) favorite(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if found {
+		// Mime comes from the station info (RB codec), as Pascal's
+		// SetVTunerStation(ARBStation) fills it; empty for MS/podcast items.
 		it := bookmark.Item{ID: strings.Replace(vs.UID, "_", "B", 1), Name: vs.Name, URL: vs.URL, Desc: vs.Description,
-			Logo: vs.Icon, Format: vs.Genre, Location: vs.Location, Bandwidth: vs.Bitrate, Mime: "", Relia: "3", Bookmark: vs.Bookmark}
+			Logo: vs.Icon, Format: vs.Genre, Location: vs.Location, Bandwidth: vs.Bitrate, Mime: vs.Mime, Relia: "3", Bookmark: vs.Bookmark}
 		s.bm.Set(mac, fav, it)
 		// Pascal's wire answer here is exactly "200 OK / Status / Content-Type:
 		// text/html" and a closed connection - no Content-Length, no Server,
