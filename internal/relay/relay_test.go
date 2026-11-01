@@ -72,3 +72,64 @@ func TestHTTPSUpstream(t *testing.T) {
 		t.Fatalf("untrusted certificate must give 502 and no audio: %q", out)
 	}
 }
+
+// TestBadStreamsWonKillServer verifies that 500s, abrupt EOFs, malformed headers,
+// or resolver panics are handled gracefully without taking down the server.
+func TestBadStreamsWontKillServer(t *testing.T) {
+	// 1. Upstream returning 500 Internal Server Error immediately
+	srv500 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "server error", http.StatusInternalServerError)
+	}))
+	defer srv500.Close()
+
+	s := &Server{
+		Resolve:   func(string) string { return srv500.URL },
+		UserAgent: "Retuner/test",
+		Pause:     time.Millisecond,
+		Transport: srv500.Client().Transport,
+	}
+	out := relayOnce(t, s)
+	if !strings.Contains(out, "502 Bad Gateway") {
+		t.Fatalf("expected 502 Bad Gateway for 500 error upstream, got: %q", out)
+	}
+
+	// 2. Upstream returning malformed icy-metaint header (letters or negative number)
+	srvBadIcy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "audio/mpeg")
+		w.Header().Set("icy-metaint", "invalid-number")
+		_, _ = w.Write([]byte("AUDIO"))
+	}))
+	defer srvBadIcy.Close()
+
+	sBadIcy := &Server{
+		Resolve:   func(string) string { return srvBadIcy.URL },
+		UserAgent: "Retuner/test",
+		Pause:     time.Millisecond,
+		Transport: srvBadIcy.Client().Transport,
+	}
+	c1, c2 := net.Pipe()
+	go sBadIcy.serve(c2)
+	_, _ = c1.Write([]byte("GET /relay?id=X HTTP/1.0\r\nIcy-MetaData: 1\r\n\r\n"))
+	_ = c1.SetReadDeadline(time.Now().Add(5 * time.Second))
+	b, _ := io.ReadAll(c1)
+	out = string(b)
+	if strings.Contains(out, "icy-metaint") {
+		t.Fatalf("invalid icy-metaint header should have been dropped: %q", out)
+	}
+	if !strings.Contains(out, "HTTP/1.0 200 OK") || !strings.Contains(out, "AUDIO") {
+		t.Fatalf("expected audio despite invalid icy-metaint: %q", out)
+	}
+
+	// 3. Resolver panicking
+	sPanic := &Server{
+		Resolve: func(string) string {
+			panic("simulated resolve panic")
+		},
+		UserAgent: "Retuner/test",
+	}
+	c1, c2 = net.Pipe()
+	go sPanic.serve(c2)
+	_, _ = c1.Write([]byte("GET /relay?id=PANIC HTTP/1.0\r\n\r\n"))
+	_ = c1.SetReadDeadline(time.Now().Add(time.Second))
+	b, _ = io.ReadAll(c1) // should close cleanly without crashing the test
+}

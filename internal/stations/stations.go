@@ -181,13 +181,19 @@ func MergeInto(dst *Group, src Group) int {
 	return added
 }
 
+type stationEntry struct {
+	cat string
+	st  Station
+}
+
 // Store holds the published list. Reload is the only way it is built, as in
 // the Pascal unit, so no input can reload alone and drop another's stations.
 type Store struct {
-	mu    sync.RWMutex
-	group Group
-	Files func() []string // extra files merged after the user's own (presets cache)
-	Own   string
+	mu      sync.RWMutex
+	group   Group
+	byIDMap map[string]stationEntry
+	Files   func() []string // extra files merged after the user's own (presets cache)
+	Own     string
 }
 
 func (s *Store) Snapshot() Group {
@@ -208,14 +214,31 @@ func (s *Store) Reload() (own, preset int) {
 			}
 		}
 	}
+	byID := make(map[string]stationEntry)
+	for _, c := range merged {
+		for _, x := range c.Stations {
+			if _, exists := byID[x.ID]; !exists {
+				byID[x.ID] = stationEntry{cat: c.Name, st: x}
+			}
+		}
+	}
 	s.mu.Lock()
 	s.group = merged
+	s.byIDMap = byID
 	s.mu.Unlock()
 	return own, preset
 }
 
 func (s *Store) ByID(id string) (cat string, st Station, ok bool) {
-	for _, c := range s.Snapshot() {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.byIDMap != nil {
+		if entry, found := s.byIDMap[id]; found {
+			return entry.cat, entry.st, true
+		}
+		return "", Station{}, false
+	}
+	for _, c := range s.group {
 		for _, x := range c.Stations {
 			if x.ID == id {
 				return c.Name, x, true

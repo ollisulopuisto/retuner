@@ -500,7 +500,9 @@ func (c *Client) StartUUIDs(cacheDir string, ttlHours int, autoRefresh bool) {
 	}
 	if autoRefresh && ttlHours > 0 {
 		go func() {
-			for range time.Tick(time.Duration(ttlHours) * time.Hour) {
+			ticker := time.NewTicker(time.Duration(ttlHours) * time.Hour)
+			defer ticker.Stop()
+			for range ticker.C {
 				c.refreshUUIDs(path)
 			}
 		}()
