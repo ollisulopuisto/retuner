@@ -236,7 +236,8 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 			}
 		case "bookmarks":
 			if s.bookmarks {
-				p.Add(s.dir(mi.Label, pathRoot+"/bookmark", s.bm.Count(r.URL.Query().Get("mac"))))
+				cleanMAC, _ := validMAC(r)
+				p.Add(s.dir(mi.Label, pathRoot+"/bookmark", s.bm.Count(cleanMAC)))
 			}
 		case "radiobrowser":
 			if s.rb != nil {
@@ -291,8 +292,13 @@ func (s *Server) station(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(id) >= 3 && id[2] == 'B' {
-		body, ok := s.bm.StationInfo(r.URL.Query().Get("mac"), id)
+		mac, ok := validMAC(r)
 		if !ok {
+			s.respond(w, http.StatusBadRequest, "text/html; charset=utf-8", nil)
+			return
+		}
+		body, found := s.bm.StationInfo(mac, id)
+		if !found {
 			s.respond(w, http.StatusNotFound, "application/xml", nil)
 		} else {
 			s.respond(w, http.StatusOK, "application/xml", body)
@@ -710,8 +716,28 @@ func redirectCode(c *config.Config) int {
 	return n
 }
 
-func (s *Server) bookmarkList(w http.ResponseWriter, r *http.Request) {
+// safeBookmarkMAC enforces safe receiver MAC identifiers to prevent path traversal.
+var safeBookmarkMAC = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+
+// validMAC validates the mac query parameter. If empty, it returns ("", true).
+// If invalid characters or path traversal are present, it returns ("", false).
+func validMAC(r *http.Request) (string, bool) {
 	mac := r.URL.Query().Get("mac")
+	if mac == "" {
+		return "", true
+	}
+	if !safeBookmarkMAC.MatchString(mac) {
+		return "", false
+	}
+	return mac, true
+}
+
+func (s *Server) bookmarkList(w http.ResponseWriter, r *http.Request) {
+	mac, ok := validMAC(r)
+	if !ok {
+		s.respond(w, http.StatusBadRequest, "text/html; charset=utf-8", nil)
+		return
+	}
 	first, last := pageRange(r.URL.Query(), s.bm.Count(mac))
 	body, ok := s.bm.Page(mac, first, last, s.nameFn(r))
 	if !ok {
@@ -725,7 +751,6 @@ func (s *Server) bookmarkList(w http.ResponseWriter, r *http.Request) {
 // user's own list resolve here so far; the Pascal handler answers "No
 // station(s) found" for an id it cannot look up, and otherwise answers an empty
 // 200 once the file is updated (it never writes a body for the call itself).
-var safeBookmarkMAC = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 
 func (s *Server) favorite(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
