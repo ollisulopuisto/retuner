@@ -95,6 +95,17 @@ bookmarks an AVR saved years ago and replays verbatim; `ytunerhost` is the
 placeholder inside those files. Both are still served and read for that reason.
 Anything persisted needs a migration, and the migration needs a test.
 
+**Naming: Retuner is the product, YTuner is only upstream.** Anything a user
+reads (log lines, warnings, UI, docs) says Retuner. YTuner stays where it is
+attribution or history: the README and `LICENSE.txt` credit, the program header,
+`APP_COPYRIGHT`, `UPSTREAM_VERSION`, links to upstream issues. vTuner stays
+wherever it names the service Retuner replaces, including the `*.vtuner.com`
+hostnames the DNS setup points at this machine. Compatibility strings (`/ytuner/`,
+`ytunerhost`, `ytuner.ini`) stay as above. The Lazarus project files keep their
+`ytuner.*` names. Last audit 2026-11-01: only the "outdated avr.ini" warning
+(Go and Pascal) still said YTuner, now fixed. CI builds and tests the Go port only;
+a change under `src/` is not compiled by any workflow here.
+
 **Which AVR config file is live depends on `CommonAVRini`, and the default is
 `avr.ini`.** Shipped as `CommonAVRini=1`, and `True` in the code as well, which
 means every receiver reads `config/avr.ini` directly and `config/<mac>.ini` is
