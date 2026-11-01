@@ -376,7 +376,7 @@ func (c *Config) LoadAVRFile(name string) (*AVR, error) {
 	avrVerKey := findKey(ensureSection(f, "Configuration"), "INIVersion")
 	if v := avrVerKey; v != nil && v.String() != avrIniVersion {
 		log.Printf("WARNING: Your %s file is outdated! Some features may not work properly!", name)
-		log.Printf("WARNING: Your %s file will be updated with new options right now. Check https://github.com/coffeegreg/YTuner/cfg for the description of appropriate avr.ini file for your version of YTuner", name)
+		log.Printf("WARNING: Your %s file will be updated with new options right now. Check https://github.com/ollisulopuisto/retuner/tree/master/cfg for the description of the appropriate avr.ini file for your version of Retuner", name)
 		v.SetValue(avrIniVersion)
 		changed = true
 	} else if avrVerKey == nil {

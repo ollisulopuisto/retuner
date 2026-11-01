@@ -250,7 +250,7 @@ begin
       if ReadString(AVR_INI_SECTION_CONFIGURATION,AVR_INI_INIVERSION,'')<>AVR_INI_VERSION then
         begin
           Logging(ltWarning, 'Your '+AAVRMAC+'.ini file is outdated! Some features may not work properly!');
-          Logging(ltWarning, 'Your '+AAVRMAC+'.ini file will be updated with new options right now. Check https://github.com/coffeegreg/YTuner/cfg for the description of appropriate avr.ini file for your version of YTuner');
+          Logging(ltWarning, 'Your '+AAVRMAC+'.ini file will be updated with new options right now. Check https://github.com/ollisulopuisto/retuner/tree/master/cfg for the description of the appropriate avr.ini file for your version of Retuner');
           WriteString(AVR_INI_SECTION_CONFIGURATION,AVR_INI_INIVERSION,AVR_INI_VERSION);
         end;
 
