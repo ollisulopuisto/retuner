@@ -229,7 +229,9 @@ func (s *Server) save(body []byte) string {
 		if json.Unmarshal(rc, &c) != nil {
 			continue
 		}
-		name := strings.TrimSpace(c.Name)
+		// Strip CR/LF and brackets to prevent INI section injection
+		name := strings.NewReplacer("\r", "", "\n", "", "[", "", "]", "").Replace(c.Name)
+		name = strings.TrimSpace(name)
 		if name == "" {
 			continue
 		}
@@ -242,9 +244,10 @@ func (s *Server) save(body []byte) string {
 			}
 			str := func(k string) string { v, _ := m[k].(string); return strings.TrimSpace(v) }
 			t.Name, t.URL, t.Logo = str("name"), str("url"), str("logo")
-			t.Name = strings.NewReplacer("=", "-", "|", "-").Replace(t.Name)
-			t.URL = strings.ReplaceAll(t.URL, "|", "-")
-			t.Logo = strings.ReplaceAll(t.Logo, "|", "-")
+			// Strip CRLF to prevent INI line injection, '=' to prevent key splitting, and '|' to preserve URL/logo separator
+			t.Name = strings.NewReplacer("=", "-", "|", "-", "\r", "", "\n", "").Replace(t.Name)
+			t.URL = strings.NewReplacer("|", "-", "\r", "", "\n", "").Replace(t.URL)
+			t.Logo = strings.NewReplacer("|", "-", "\r", "", "\n", "").Replace(t.Logo)
 			if t.Name == "" || t.URL == "" {
 				continue
 			}

@@ -120,3 +120,23 @@ func TestRemoteCommandWhitelistWithoutReceiver(t *testing.T) {
 		t.Errorf("%s", w.Body.String())
 	}
 }
+
+func TestSaveSanitizesCRLFInjection(t *testing.T) {
+	s := newSrv(t, "")
+	payload := `{"categories":[{"name":"Cat\r\n[InjectedCategory]\nEvil=http://evil.com","stations":[{"name":"Normal\r\nInjectedStation","url":"http://stream\r\nInjectedKey=val","logo":"http://logo\r\nAnotherKey=val"}]}]}`
+	w := do(s, "127.0.0.1:1", "POST", "/api/stations", "", true, "application/json", payload)
+	if w.Code != 200 {
+		t.Fatalf("unexpected code: %d", w.Code)
+	}
+	content, err := os.ReadFile(s.Store.Own)
+	if err != nil {
+		t.Fatalf("failed to read stations file: %v", err)
+	}
+	raw := string(content)
+	if strings.Contains(raw, "\n[InjectedCategory]") || strings.Contains(raw, "\r") || strings.Contains(raw, "\nInjectedStation") || strings.Contains(raw, "\nInjectedKey=") || strings.Contains(raw, "\nAnotherKey=") {
+		t.Fatalf("CRLF injection succeeded in saved stations file:\n%s", raw)
+	}
+	if strings.Count(raw, "[") != 1 || strings.Count(raw, "]") != 1 {
+		t.Fatalf("unexpected number of section brackets: %s", raw)
+	}
+}
