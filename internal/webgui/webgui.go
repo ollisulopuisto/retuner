@@ -285,6 +285,10 @@ func fieldInt(body []byte, f string) (int, bool) {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Defend against clickjacking and MIME-type confusion attacks on the admin interface.
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+
 	host, _, _ := net.SplitHostPort(r.RemoteAddr)
 	if !s.clientAllowed(host) {
 		log.Printf("%s: refused %s from %s (WebGUIIPAddress=%s)", service, r.URL.RequestURI(), host, s.Allowed)

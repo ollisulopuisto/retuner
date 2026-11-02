@@ -140,3 +140,17 @@ func TestSaveSanitizesCRLFInjection(t *testing.T) {
 		t.Fatalf("unexpected number of section brackets: %s", raw)
 	}
 }
+
+func TestWebGUISecurityHeaders(t *testing.T) {
+	s := newSrv(t, "")
+	paths := []string{"/", "/remote", "/api/status", "/api/stations"}
+	for _, p := range paths {
+		w := do(s, "127.0.0.1:1", "GET", p, "", true, "", "")
+		if xfo := w.Header().Get("X-Frame-Options"); xfo != "DENY" {
+			t.Errorf("%s: expected X-Frame-Options: DENY, got %q", p, xfo)
+		}
+		if xcto := w.Header().Get("X-Content-Type-Options"); xcto != "nosniff" {
+			t.Errorf("%s: expected X-Content-Type-Options: nosniff, got %q", p, xcto)
+		}
+	}
+}
