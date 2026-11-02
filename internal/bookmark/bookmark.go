@@ -107,21 +107,39 @@ func (s *Store) read(mac string) (*file, bool, error) {
 // Reusing a single replacer instance avoids allocating a new replacer trie on every field.
 var xmlEscaper = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
 
-func esc(s string) string {
-	return xmlEscaper.Replace(s)
-}
-
+// el writes a single XML element indented by 4 spaces.
+// To avoid intermediate string allocations from string concatenation and Replace(),
+// we stream tags directly to the buffer and use xmlEscaper.WriteString.
 func el(b *bytes.Buffer, name, val string, selfClose bool) {
 	if selfClose && val == "" {
-		b.WriteString("    <" + name + "/>\n")
+		b.WriteString("    <")
+		b.WriteString(name)
+		b.WriteString("/>\n")
 		return
 	}
-	b.WriteString("    <" + name + ">" + esc(val) + "</" + name + ">\n")
+	b.WriteString("    <")
+	b.WriteString(name)
+	b.WriteString(">")
+	if strings.ContainsAny(val, "&<>") {
+		xmlEscaper.WriteString(b, val)
+	} else {
+		b.WriteString(val)
+	}
+	b.WriteString("</")
+	b.WriteString(name)
+	b.WriteString(">\n")
 }
 
 func render(count int, items []Item) []byte {
 	var b bytes.Buffer
-	b.WriteString("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<ListOfItems>\n  <ItemCount>" + strconv.Itoa(count) + "</ItemCount>\n")
+	// Preallocate buffer capacity based on item count (~512 bytes per item plus headers)
+	// to prevent repeated slice reallocation in bytes.growSlice during serialization.
+	if len(items) > 0 {
+		b.Grow(len(items)*512 + 128)
+	}
+	b.WriteString("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<ListOfItems>\n  <ItemCount>")
+	b.WriteString(strconv.Itoa(count))
+	b.WriteString("</ItemCount>\n")
 	for _, i := range items {
 		selfClose := !i.Fresh
 		b.WriteString("  <Item>\n")

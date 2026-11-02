@@ -86,3 +86,46 @@ func TestPerMACFileNames(t *testing.T) {
 		t.Error("escaped Dir")
 	}
 }
+
+func TestRenderEquivalence(t *testing.T) {
+	items := []Item{
+		{ID: "1", Name: "Plain", URL: "http://example.com", Desc: "", Fresh: false},
+		{ID: "2", Name: "Rock & Roll <Live>", URL: "http://example.com/stream?a=1&b=2", Desc: "Quotes & > <", Fresh: false},
+		{ID: "3", Name: "Fresh Item", URL: "http://fresh", Desc: "", Fresh: true},
+	}
+	out := string(render(len(items), items))
+	if !strings.Contains(out, "<StationName>Rock &amp; Roll &lt;Live&gt;</StationName>") {
+		t.Fatalf("escaping failed: %s", out)
+	}
+	if !strings.Contains(out, "<StationDesc/>") {
+		t.Fatalf("self-closing element missing: %s", out)
+	}
+	if !strings.Contains(out, "<StationDesc></StationDesc>") {
+		t.Fatalf("fresh empty element missing: %s", out)
+	}
+}
+
+func BenchmarkRender(b *testing.B) {
+	items := make([]Item, 100)
+	for i := 0; i < 100; i++ {
+		items[i] = Item{
+			ID:        "MSB12345",
+			Name:      "Rock & Roll <Favorites>",
+			URL:       "http://stream.example.com/live?id=1&token=xyz",
+			Desc:      "Classic & Hard Rock",
+			Logo:      "http://retunerhost/retuner/icon?id=123",
+			Format:    "Rock",
+			Location:  "New York, USA",
+			Bandwidth: "320",
+			Mime:      "MP3",
+			Relia:     "3",
+			Bookmark:  "http://retunerhost/setupapp/favxml.asp?id=123&fav=del",
+		}
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = render(len(items), items)
+	}
+}
