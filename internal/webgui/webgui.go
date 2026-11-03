@@ -285,9 +285,10 @@ func fieldInt(body []byte, f string) (int, bool) {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Defend against clickjacking and MIME-type confusion attacks on the admin interface.
+	// Defend against clickjacking, MIME confusion, and script injection on the admin interface.
 	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: *")
 
 	host, _, _ := net.SplitHostPort(r.RemoteAddr)
 	if !s.clientAllowed(host) {
