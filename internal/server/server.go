@@ -543,22 +543,35 @@ func httpDecode(s string) string {
 
 // urlEncode is URLEncode in common.pas: every byte that is not an ASCII letter
 // becomes %XX - digits, dots and dashes included.
+// Bolt optimization: Pre-counts non-letter characters to fast-path all-letter strings
+// with 0 allocations, pre-sizes the builder buffer to avoid reallocations, and
+// writes hex digits directly using a constant table to eliminate slice and string allocations.
 func urlEncode(s string) string {
+	extra := 0
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if !((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) {
+			extra += 2
+		}
+	}
+	if extra == 0 {
+		return s
+	}
+
+	const hexChars = "0123456789ABCDEF"
 	var b strings.Builder
+	b.Grow(len(s) + extra)
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') {
 			b.WriteByte(c)
 		} else {
-			b.WriteString("%" + strings.ToUpper(hex2(c)))
+			b.WriteByte('%')
+			b.WriteByte(hexChars[c>>4])
+			b.WriteByte(hexChars[c&15])
 		}
 	}
 	return b.String()
-}
-
-func hex2(c byte) string {
-	const d = "0123456789ABCDEF"
-	return string([]byte{d[c>>4], d[c&15]})
 }
 
 // pageRange is GetPageRange in httpserver.pas, indices zero-based inclusive.
