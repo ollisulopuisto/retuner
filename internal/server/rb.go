@@ -216,10 +216,6 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	text := q.Get("search")
 	if q.Get("sSearchtype") == "3" {
-		if _, ok := validMAC(r); !ok {
-			s.respond(w, http.StatusBadRequest, "text/html; charset=utf-8", nil)
-			return
-		}
 		id := ""
 		switch {
 		case len(text) >= 2 && (text[:2] == stations.Prefix || text[:2] == "RB"):

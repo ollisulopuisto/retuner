@@ -152,5 +152,8 @@ func TestWebGUISecurityHeaders(t *testing.T) {
 		if xcto := w.Header().Get("X-Content-Type-Options"); xcto != "nosniff" {
 			t.Errorf("%s: expected X-Content-Type-Options: nosniff, got %q", p, xcto)
 		}
+		if csp := w.Header().Get("Content-Security-Policy"); !strings.Contains(csp, "default-src 'self'") {
+			t.Errorf("%s: expected Content-Security-Policy header with default-src 'self', got %q", p, csp)
+		}
 	}
 }
