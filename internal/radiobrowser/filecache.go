@@ -6,12 +6,23 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"retuner/internal/config"
 )
+
+// safeCacheMAC ensures receiver identifiers cannot cause path traversal in CacheDir.
+var safeCacheMAC = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+
+func cleanCacheMAC(mac string) string {
+	if mac == "" || !safeCacheMAC.MatchString(mac) {
+		return "avr"
+	}
+	return mac
+}
 
 // catFile: every station or category list is one file in the cache folder,
 // "<RBS|RBC>-<mac>-<kind>[-<hash>]-<crc of avr ini>.cache", in the Pascal
@@ -26,9 +37,7 @@ import (
 func (c *Client) fileMode() bool { return c.CacheType == "catFile" && c.CacheDir != "" }
 
 func (c *Client) filePath(prefix, mac string, a *config.AVR, rest string) string {
-	if mac == "" {
-		mac = "avr"
-	}
+	mac = cleanCacheMAC(mac)
 	return filepath.Join(c.CacheDir, prefix+"-"+mac+"-"+rest+"-"+strconv.FormatUint(uint64(a.FileCRC), 10)+".cache")
 }
 
@@ -41,9 +50,7 @@ func (c *Client) filePath(prefix, mac string, a *config.AVR, rest string) string
 func (c *Client) IndexFiles(mac string, a *config.AVR) { c.indexFor(mac, a) }
 
 func (c *Client) indexFor(mac string, a *config.AVR) {
-	if mac == "" {
-		mac = "avr"
-	}
+	mac = cleanCacheMAC(mac)
 	c.idxMu.Lock()
 	defer c.idxMu.Unlock()
 	if c.idxMacs[mac] {
@@ -240,9 +247,7 @@ var _ = strings.ToLower
 
 // fromListFiles finds a station in the receiver's cached station lists on disk.
 func (c *Client) fromListFiles(uuid, mac string, a *config.AVR) (Station, bool) {
-	if mac == "" {
-		mac = "avr"
-	}
+	mac = cleanCacheMAC(mac)
 	c.indexFor(mac, a)
 	files, _ := filepath.Glob(filepath.Join(c.CacheDir, "RBS-"+mac+"-*-"+strconv.FormatUint(uint64(a.FileCRC), 10)+".cache"))
 	for _, p := range files {
