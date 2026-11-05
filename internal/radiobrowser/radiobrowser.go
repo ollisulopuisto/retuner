@@ -17,11 +17,11 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"retuner/internal/config"
 )
@@ -183,23 +183,53 @@ func toStation(m map[string]any) Station {
 		Language: clean(str(m, "language")), Votes: str(m, "votes"), Codec: str(m, "codec"), Bitrate: str(m, "bitrate")}
 }
 
-// wild is IsWild(..., ignore case): * and ? wildcards over the whole string.
-func wild(s, pat string) bool {
-	var b strings.Builder
-	b.WriteString("(?is)^")
-	for _, r := range pat {
-		switch r {
-		case '*':
-			b.WriteString(".*")
-		case '?':
-			b.WriteString(".")
-		default:
-			b.WriteString(regexp.QuoteMeta(string(r)))
+func foldByte(c byte) byte {
+	if c >= 'A' && c <= 'Z' {
+		return c + ('a' - 'A')
+	}
+	return c
+}
+
+func matchGlob[T byte | rune](s, pat []T, star, qmark T, eq func(T, T) bool) bool {
+	si, pi, starIdx, matchIdx := 0, 0, -1, 0
+	for si < len(s) {
+		if pi < len(pat) && (pat[pi] == qmark || eq(s[si], pat[pi])) {
+			si++
+			pi++
+		} else if pi < len(pat) && pat[pi] == star {
+			starIdx, matchIdx = pi, si
+			pi++
+		} else if starIdx != -1 {
+			matchIdx++
+			si, pi = matchIdx, starIdx+1
+		} else {
+			return false
 		}
 	}
-	b.WriteString("$")
-	re, err := regexp.Compile(b.String())
-	return err == nil && re.MatchString(s)
+	for pi < len(pat) && pat[pi] == star {
+		pi++
+	}
+	return pi == len(pat)
+}
+
+// wild matches pat against s case-insensitively (* and ? wildcards, matching IsWild in common.pas).
+// Bolt optimization: Fast-path exact matches without wildcards via strings.EqualFold, and match
+// ASCII strings iteratively with zero allocations instead of compiling a dynamic regexp on every call.
+func wild(s, pat string) bool {
+	if !strings.ContainsAny(pat, "*?") {
+		return strings.EqualFold(s, pat)
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] >= 0x80 {
+			return matchGlob([]rune(s), []rune(pat), '*', '?', func(a, b rune) bool { return unicode.ToLower(a) == unicode.ToLower(b) })
+		}
+	}
+	for i := 0; i < len(pat); i++ {
+		if pat[i] >= 0x80 {
+			return matchGlob([]rune(s), []rune(pat), '*', '?', func(a, b rune) bool { return unicode.ToLower(a) == unicode.ToLower(b) })
+		}
+	}
+	return matchGlob([]byte(s), []byte(pat), '*', '?', func(a, b byte) bool { return foldByte(a) == foldByte(b) })
 }
 
 func haveCommon(s string, list []string) bool {

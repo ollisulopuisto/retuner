@@ -14,9 +14,24 @@ func TestWildAndLists(t *testing.T) {
 	for _, c := range []struct {
 		s, p string
 		want bool
-	}{{"Rock", "rock", true}, {"Hard Rock", "*rock", true}, {"Rocket", "rock", false}, {"ab", "a?", true}, {"x.y", "x.y", true}, {"xzy", "x.y", false}} {
+	}{
+		{"Rock", "rock", true},
+		{"Hard Rock", "*rock", true},
+		{"Rocket", "rock", false},
+		{"ab", "a?", true},
+		{"x.y", "x.y", true},
+		{"xzy", "x.y", false},
+		{"", "", true},
+		{"", "*", true},
+		{"", "?", false},
+		{"abc", "*b*", true},
+		{"abc", "*d*", false},
+		{"Äpfel", "*pfel", true},
+		{"Äpfel", "*PFEL", true},
+		{"Äpfel", "ä?fel", true},
+	} {
 		if wild(c.s, c.p) != c.want {
-			t.Errorf("wild(%q,%q)", c.s, c.p)
+			t.Errorf("wild(%q,%q) = %v, want %v", c.s, c.p, !c.want, c.want)
 		}
 	}
 	if !haveCommon("pop, rock/jazz", []string{"ROCK"}) || haveCommon("pop", []string{"rock"}) {
@@ -24,6 +39,31 @@ func TestWildAndLists(t *testing.T) {
 	}
 	if !containsIn("Some Ad Radio", []string{"ad radio"}) {
 		t.Error("containsIn")
+	}
+}
+
+func BenchmarkWild_Exact(b *testing.B) {
+	s, p := "Rock", "rock"
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = wild(s, p)
+	}
+}
+
+func BenchmarkWild_Wildcard(b *testing.B) {
+	s, p := "Hard Rock", "*rock"
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = wild(s, p)
+	}
+}
+
+func BenchmarkHaveCommon(b *testing.B) {
+	tags := "rock, classic rock, 80s, pop"
+	allowed := []string{"jazz", "blues", "metal", "rock"}
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = haveCommon(tags, allowed)
 	}
 }
 
