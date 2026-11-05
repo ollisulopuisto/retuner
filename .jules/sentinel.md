@@ -7,3 +7,8 @@
 **Vulnerability:** Structured text generators (such as INI, YAML, or XML writers) receiving string fields from JSON endpoints must sanitize line terminators (`\r`, `\n`) and syntactic delimiters (e.g. `[` and `]`) in additions and updates.
 **Learning:** Even when field separators like `=` and `|` were replaced, unescaped newlines in JSON payloads allowed injecting entire sections and arbitrary key-value pairs into the generated `.ini` file.
 **Prevention:** Always strip or sanitize carriage returns, newlines, and section delimiter brackets when serializing user-supplied JSON data to line-based config formats.
+
+## 2026-11-02 - Query-Specific Fallback Path Validation Across Multi-Purpose Endpoints
+**Vulnerability:** Multi-purpose endpoints that route secondary flows (such as search endpoints multiplexed for direct playback requests) can bypass parameter validation enforced on dedicated endpoints if parameters are handled conditionally.
+**Learning:** When endpoint parameters like `mac` or fallback values like `r.Host` are forwarded internally to file lookup or storage routines, any secondary control paths must enforce the same boundary validation as primary endpoints.
+**Prevention:** Perform boundary validation on receiver identifiers across all routed query types before internal dispatch.

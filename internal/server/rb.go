@@ -2,6 +2,7 @@ package server
 
 import (
 	"log"
+	"net"
 	"net/http"
 	"regexp"
 	"retuner/internal/translator"
@@ -221,11 +222,23 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request) {
 		case len(text) >= 2 && (text[:2] == stations.Prefix || text[:2] == "RB"):
 			id = text
 		case s.bm != nil:
-			dev := q.Get("mac")
-			if dev == "" {
-				dev = r.Host
+			// Enforce MAC validation against path traversal at the HTTP boundary.
+			mac, ok := validMAC(r)
+			if !ok {
+				s.respond(w, http.StatusBadRequest, "text/html; charset=utf-8", nil)
+				return
 			}
-			if s.bm.HasFile(dev) {
+			dev := mac
+			if dev == "" {
+				host := r.Host
+				if h, _, err := net.SplitHostPort(r.Host); err == nil {
+					host = h
+				}
+				if safeBookmarkMAC.MatchString(host) {
+					dev = host
+				}
+			}
+			if dev != "" && s.bm.HasFile(dev) {
 				id = "UNB" + text
 				q.Set("mac", dev)
 			} else if g := s.store.Snapshot(); s.mystOn && len(g) > 0 && len(g[0].Stations) > 0 {
