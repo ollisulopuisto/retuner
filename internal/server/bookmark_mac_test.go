@@ -8,6 +8,7 @@ import (
 
 	"retuner/internal/bookmark"
 	"retuner/internal/config"
+	"retuner/internal/radiobrowser"
 	"retuner/internal/stations"
 )
 
@@ -24,7 +25,7 @@ func newTestServer(t *testing.T) *Server {
 	}
 	store := &stations.Store{}
 	bm := &bookmark.Store{Dir: filepath.Join(dir, "config"), Common: false, Limit: 10, URLHost: "localhost"}
-	return New(cfg, avr, "localhost", store, bm, nil, nil)
+	return New(cfg, avr, "localhost", store, bm, nil, &radiobrowser.Client{})
 }
 
 func TestBookmarkMACValidation(t *testing.T) {
@@ -61,5 +62,20 @@ func TestBookmarkMACValidation(t *testing.T) {
 	h.ServeHTTP(w, req)
 	if w.Code == http.StatusBadRequest {
 		t.Errorf("expected valid MAC in statxml bookmark lookup to not return 400, got %d", w.Code)
+	}
+
+	// 3. search endpoint with sSearchtype=3: /setupapp/foo/search.asp
+	req = httptest.NewRequest("GET", "/setupapp/foo/search.asp?sSearchtype=3&search=1&mac=../../etc/passwd", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected invalid MAC in search play request to return 400, got %d", w.Code)
+	}
+
+	req = httptest.NewRequest("GET", "/setupapp/foo/search.asp?sSearchtype=3&search=1&mac=001122334455", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code == http.StatusBadRequest {
+		t.Errorf("expected valid MAC in search play request to not return 400, got %d", w.Code)
 	}
 }
