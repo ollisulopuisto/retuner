@@ -37,6 +37,19 @@ func TestWildAndLists(t *testing.T) {
 	if !haveCommon("pop, rock/jazz", []string{"ROCK"}) || haveCommon("pop", []string{"rock"}) {
 		t.Error("haveCommon")
 	}
+	// Test delimiter variations, leading/trailing whitespace, and consecutive delimiters
+	if !haveCommon(" ;; ,, // ; rock ; // ", []string{"rock"}) {
+		t.Error("haveCommon with leading/trailing delimiters and whitespace")
+	}
+	if haveCommon(";; ,, //", []string{"rock"}) {
+		t.Error("haveCommon with only delimiters")
+	}
+	if haveCommon("", []string{"rock"}) {
+		t.Error("haveCommon with empty string")
+	}
+	if !haveCommon("rock", []string{"rock"}) {
+		t.Error("haveCommon with single element without delimiters")
+	}
 	if !containsIn("Some Ad Radio", []string{"ad radio"}) {
 		t.Error("containsIn")
 	}
