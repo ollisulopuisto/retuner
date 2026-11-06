@@ -17,3 +17,8 @@
 **Vulnerability:** File cache keying schemes that incorporate receiver identifiers into on-disk file paths can allow path traversal if the caching subsystem does not independently validate the identifier format.
 **Learning:** While perimeter request handlers perform input validation, internal caching abstractions (such as catFile cache) constructing file paths via `filepath.Join` must not assume inputs are already validated; any unvalidated or empty identifier must safely fall back.
 **Prevention:** Apply defense-in-depth boundary validation (`^[A-Za-z0-9_-]{1,64}$`) within internal file caching layers before constructing paths or glob patterns in cache directories.
+
+## 2026-11-06 - Receiver Configuration File Path Validation
+**Vulnerability:** Configuration loaders constructing file paths in configuration directories could traverse outside the target directory if passed relative path sequences in filenames.
+**Learning:** Lower-level configuration loaders called by multi-tenant subsystems must independently enforce path containment rather than assuming callers have validated file arguments.
+**Prevention:** Require configuration file names to be strictly local single filenames without path separators using `filepath.IsLocal` and separator checks before joining paths.
