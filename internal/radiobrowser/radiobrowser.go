@@ -232,12 +232,27 @@ func wild(s, pat string) bool {
 	return matchGlob([]byte(s), []byte(pat), '*', '?', func(a, b byte) bool { return foldByte(a) == foldByte(b) })
 }
 
+// haveCommon checks if any delimited element in s matches any pattern in list.
+// Delimiters are ',', '/', and ';'.
+// Bolt optimization: Zero-allocation iterative scan avoiding strings.FieldsFunc slice allocation.
 func haveCommon(s string, list []string) bool {
-	for _, e := range strings.FieldsFunc(s, func(r rune) bool { return r == ',' || r == '/' || r == ';' }) {
-		for _, p := range list {
-			if wild(strings.TrimSpace(e), p) {
-				return true
+	if len(list) == 0 || len(s) == 0 {
+		return false
+	}
+	start := 0
+	for i := 0; i <= len(s); i++ {
+		if i == len(s) || s[i] == ',' || s[i] == '/' || s[i] == ';' {
+			if i > start {
+				elem := strings.TrimSpace(s[start:i])
+				if len(elem) > 0 {
+					for _, p := range list {
+						if wild(elem, p) {
+							return true
+						}
+					}
+				}
 			}
+			start = i + 1
 		}
 	}
 	return false
