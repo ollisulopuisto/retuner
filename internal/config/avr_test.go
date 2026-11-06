@@ -37,3 +37,26 @@ func TestAVRListsSurviveSemicolonsAndPerMACFilesAreSeparate(t *testing.T) {
 		t.Fatalf("per-MAC config should be independent and filled with defaults: %+v", m)
 	}
 }
+
+func TestLoadAVRFileRejectsTraversal(t *testing.T) {
+	dir := t.TempDir()
+	ini := filepath.Join(dir, "retuner.ini")
+	_ = os.WriteFile(ini, []byte("[Configuration]\nCommonAVRini=0\n"), 0o644)
+	c, err := Load(ini)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	traversalNames := []string{
+		"../outside.ini",
+		"..\\win_outside.ini",
+		"/tmp/abs.ini",
+		"sub/folder.ini",
+	}
+
+	for _, name := range traversalNames {
+		if _, err := c.LoadAVRFile(name); err == nil {
+			t.Fatalf("LoadAVRFile(%q) succeeded, expected error", name)
+		}
+	}
+}

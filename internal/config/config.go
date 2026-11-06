@@ -338,6 +338,9 @@ func (c *Config) LoadAVR() (*AVR, error) { return c.LoadAVRFile("avr.ini") }
 // avr.ini, or <mac>.ini when CommonAVRini is off.
 func (c *Config) LoadAVRFile(name string) (*AVR, error) {
 	dir := c.ConfigDir()
+	if !filepath.IsLocal(name) || strings.ContainsAny(name, `/\`) {
+		return nil, os.ErrInvalid
+	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}
