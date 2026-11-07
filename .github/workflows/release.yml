@@ -1,12 +1,12 @@
 name: Cut a release
 
-# The version is already written down -- in src/common.pas, and again in the
+# The version is already written down -- in internal/config/config.go, and again in the
 # add-on's config.yaml -- so a release is not a decision about a number, it is
 # the act of building that commit and publishing it. This does that from a
 # button, which is also the only way it can be done by anyone without rights to
 # push a tag.
 #
-# It deliberately does not bump anything. APP_VERSION moves in a commit that
+# It deliberately does not bump anything. AppVersion moves in a commit that
 # says why, gets reviewed, and lands on master; this publishes what is there.
 
 on:
@@ -20,6 +20,9 @@ on:
 
 permissions:
   contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   version:
@@ -36,18 +39,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
-          # The single quotes in the Pascal constant are the delimiters, which
-          # is what makes this greppable at all: APP_VERSION = '26.08.28.3';
-          app=$(sed -n "s/^ *APP_VERSION *= *'\([0-9.]*\)'.*/\1/p" src/common.pas)
+          app=$(sed -n 's/.*AppVersion *= *"\([0-9.]*\)".*/\1/p' internal/config/config.go)
           addon=$(sed -n 's/^version: *"\([0-9.]*\)".*/\1/p' viritin/config.yaml)
-          echo "src/common.pas:      $app"
-          echo "viritin/config.yaml: $addon"
+          echo "internal/config/config.go: $app"
+          echo "viritin/config.yaml:        $addon"
 
-          [ -n "$app" ] || { echo "no APP_VERSION found in src/common.pas"; exit 1; }
-          # The add-on's version tracks APP_VERSION, and a release where they
+          [ -n "$app" ] || { echo "no AppVersion found in internal/config/config.go"; exit 1; }
+          # The add-on's version tracks AppVersion, and a release where they
           # disagree ships a binary and an add-on that claim different things.
           if [ "$app" != "$addon" ]; then
-            echo "::error::src/common.pas says $app and viritin/config.yaml says $addon"
+            echo "::error::internal/config/config.go says $app and viritin/config.yaml says $addon"
             exit 1
           fi
 
@@ -55,7 +56,7 @@ jobs:
           # people have downloaded it, and the updater verifies against the
           # SHA256SUMS it published.
           if gh release view "v$app" >/dev/null 2>&1; then
-            echo "::error::v$app is already released. Bump APP_VERSION first."
+            echo "::error::v$app is already released. Bump AppVersion first."
             exit 1
           fi
 

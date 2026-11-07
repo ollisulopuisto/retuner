@@ -1,7 +1,8 @@
-# Go port of Viritin (work in progress)
+# Go port of Viritin (Completed)
 
-Status of the port from Free Pascal to Go. The Pascal sources in `src/` are
-untouched and remain the reference implementation.
+Status of the port from Free Pascal to Go. The Go port is now the complete and
+exclusive implementation of Viritin; the legacy Pascal sources in `src/` have
+been decommissioned and removed as of v26.11.07.398.
 
 ## Method
 

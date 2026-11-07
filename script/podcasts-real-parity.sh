@@ -3,6 +3,11 @@
 # serves the identical bytes over local http and compares both binaries:
 # feed list, episode lists, paging, station info and play redirects.
 # Not part of CI.   ./script/podcasts-real-parity.sh <reference-binary> <go-binary>
+# [HISTORICAL] This test verified byte parity against the legacy Free Pascal reference binary.
+# The Pascal implementation was decommissioned; this script is preserved for historical reference.
+echo "Skipping: Parity test archived (Pascal reference decommissioned)." >&2
+exit 0
+
 set -eu
 REF=${1:?reference}; NEW=${2:?go binary}
 W=$(mktemp -d); M=18852; P=18752

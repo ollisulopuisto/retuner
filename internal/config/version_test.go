@@ -6,19 +6,17 @@ import (
 	"testing"
 )
 
-// The release workflow names archives after src/common.pas's APP_VERSION and
-// the updater compares that against the release tag, so the Go binary has to
-// report the same string.
-func TestAppVersionMatchesPascal(t *testing.T) {
-	b, err := os.ReadFile("../../src/common.pas")
+// The release workflow checks that AppVersion and the add-on config.yaml version agree.
+func TestAppVersionMatchesAddonConfig(t *testing.T) {
+	b, err := os.ReadFile("../../viritin/config.yaml")
 	if err != nil {
-		t.Skip("src/common.pas not available")
+		t.Skip("viritin/config.yaml not available")
 	}
-	m := regexp.MustCompile(`(?m)^\s*APP_VERSION\s*=\s*'([0-9.]+)'`).FindSubmatch(b)
+	m := regexp.MustCompile(`(?m)^version:\s*"([0-9.]+)"`).FindSubmatch(b)
 	if m == nil {
-		t.Fatal("no APP_VERSION in src/common.pas")
+		t.Fatal("no version found in viritin/config.yaml")
 	}
 	if string(m[1]) != AppVersion {
-		t.Fatalf("AppVersion %q, src/common.pas %q", AppVersion, m[1])
+		t.Fatalf("AppVersion %q, viritin/config.yaml %q", AppVersion, m[1])
 	}
 }
