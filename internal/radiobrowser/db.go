@@ -14,7 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"retuner/internal/config"
+	"viritin/internal/config"
 
 	_ "modernc.org/sqlite" // pure Go SQLite, no cgo
 )

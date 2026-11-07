@@ -10,7 +10,7 @@ import (
 // (Pascal's TIniFile has no inline comments).
 func TestAVRListsSurviveSemicolonsAndPerMACFilesAreSeparate(t *testing.T) {
 	dir := t.TempDir()
-	ini := filepath.Join(dir, "retuner.ini")
+	ini := filepath.Join(dir, "viritin.ini")
 	_ = os.WriteFile(ini, []byte("[Configuration]\nCommonAVRini=0\n"), 0o644)
 	_ = os.MkdirAll(filepath.Join(dir, "config"), 0o755)
 	_ = os.WriteFile(filepath.Join(dir, "config", "avr.ini"), []byte("[MainMenu Items]\nIdentifiersList=about;radiobrowser\nLabelsList=A;B\n[RadioBrowser Filtering]\nAllowedTags=rock; jazz!;{empty}\nBitrateMax=128\n[RadioBrowser Sorting]\nOrder=votes\nReverse=1\n"), 0o644)
@@ -40,7 +40,7 @@ func TestAVRListsSurviveSemicolonsAndPerMACFilesAreSeparate(t *testing.T) {
 
 func TestLoadAVRFileRejectsTraversal(t *testing.T) {
 	dir := t.TempDir()
-	ini := filepath.Join(dir, "retuner.ini")
+	ini := filepath.Join(dir, "viritin.ini")
 	_ = os.WriteFile(ini, []byte("[Configuration]\nCommonAVRini=0\n"), 0o644)
 	c, err := Load(ini)
 	if err != nil {

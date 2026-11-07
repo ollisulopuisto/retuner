@@ -145,7 +145,7 @@ def main():
         n = write_png(a.out, a.size[0], a.size[1], build(a.size[0], a.size[1]))
         print(f"{a.out}  {a.size[0]}x{a.size[1]}  {n/1024:.1f} KB")
         return
-    for path, w, h in (("retuner/icon.png", 512, 512), ("retuner/logo.png", 640, 320)):
+    for path, w, h in (("viritin/icon.png", 512, 512), ("viritin/logo.png", 640, 320)):
         n = write_png(path, w, h, build(w, h))
         print(f"{path}  {w}x{h}  {n/1024:.1f} KB")
 

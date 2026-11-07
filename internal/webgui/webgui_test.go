@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"retuner/internal/stations"
+	"viritin/internal/stations"
 )
 
 func newSrv(t *testing.T, allowed string) *Server {
@@ -17,7 +17,7 @@ func newSrv(t *testing.T, allowed string) *Server {
 	os.WriteFile(f, []byte("[A]\nOne=http://e/1\n"), 0o644)
 	st := &stations.Store{Own: f}
 	st.Reload()
-	return &Server{Allowed: allowed, User: "admin", Password: "pw", Store: st, FileName: "stations.ini", AppName: "Retuner", Version: "v"}
+	return &Server{Allowed: allowed, User: "admin", Password: "pw", Store: st, FileName: "stations.ini", AppName: "Viritin", Version: "v"}
 }
 
 func do(s *Server, remote, method, path, host string, auth bool, ctype, body string) *httptest.ResponseRecorder {

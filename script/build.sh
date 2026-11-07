@@ -40,5 +40,6 @@ if [ "$OUT_OS" = "windows" ]; then
   EXE_SUFFIX=".exe"
 fi
 
-env GOOS=$GO_OS GOARCH=$GO_ARCH go build -o "$TARGET_DIR/retuner$EXE_SUFFIX" main.go
-echo "Built $TARGET_DIR/retuner$EXE_SUFFIX"
+env GOOS=$GO_OS GOARCH=$GO_ARCH go build -o "$TARGET_DIR/viritin$EXE_SUFFIX" main.go
+ln -sf "viritin$EXE_SUFFIX" "$TARGET_DIR/retuner$EXE_SUFFIX"
+echo "Built $TARGET_DIR/viritin$EXE_SUFFIX"

@@ -1,12 +1,12 @@
 # Country presets
 
-A preset is a short, curated station list for one country. Retuner fetches the
+A preset is a short, curated station list for one country. Viritin fetches the
 file for each country you configure and merges it into the "My stations" menu,
 so a new install has something worth listening to before anyone edits a config
 file.
 
 ```
-presets/fi.ini      ->  https://raw.githubusercontent.com/ollisulopuisto/retuner/master/presets/fi.ini
+presets/fi.ini      ->  https://raw.githubusercontent.com/ollisulopuisto/viritin/master/presets/fi.ini
 ```
 
 The file name is the ISO 3166-1 alpha-2 country code, lowercased. The format is
@@ -112,16 +112,16 @@ does not inherit the old one's strikes.
 
 `presets/strikes.json` is that record, and is carried in the same pull request.
 It is rebuilt from scratch on each run, so a station you delete by hand leaves
-nothing behind. Nothing reads it at runtime — Retuner never sees it.
+nothing behind. Nothing reads it at runtime — Viritin never sees it.
 
 In the pull request, `warn` lines are a watchlist and `drop` lines are
 removals. Check a dropped station before merging: a stream can refuse a
 datacentre in particular, and a broadcaster that has moved its URL wants the
 new one rather than deleting the entry.
 
-## How Retuner uses them
+## How Viritin uses them
 
-Set the countries in the add-on's configuration, or in `retuner.ini`:
+Set the countries in the add-on's configuration, or in `viritin.ini`:
 
 ```ini
 [Presets]
@@ -129,7 +129,7 @@ Enable=1
 PresetsCountries=fi,se
 ```
 
-At startup Retuner fetches each file, validates that it parses and contains at
+At startup Viritin fetches each file, validates that it parses and contains at
 least one http(s) URL, and only then replaces its cached copy in
 `config/presets/`. A fetch that fails leaves the previous copy in place, so a
 network problem costs you yesterday's list rather than the whole menu. Your own

@@ -23,7 +23,7 @@ import (
 	"time"
 	"unicode"
 
-	"retuner/internal/config"
+	"viritin/internal/config"
 )
 
 type Kind int

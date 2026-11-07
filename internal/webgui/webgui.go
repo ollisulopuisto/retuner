@@ -19,8 +19,8 @@ import (
 	"strings"
 	"time"
 
-	"retuner/internal/fpjson"
-	"retuner/internal/stations"
+	"viritin/internal/fpjson"
+	"viritin/internal/stations"
 )
 
 //go:embed gui.html
@@ -31,7 +31,7 @@ var remotePage string
 
 const (
 	failedAuthDelay = time.Second
-	realm           = "Retuner"
+	realm           = "Viritin"
 	service         = "Web GUI"
 )
 
@@ -378,7 +378,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // Start listens on ip:port. Without a password it refuses to start.
 func (s *Server) Start(ip string, port int) bool {
 	if s.Password == "" {
-		log.Printf("%s: no password set. Set WebGUIPassword in retuner.ini; not starting.", service)
+		log.Printf("%s: no password set. Set WebGUIPassword in viritin.ini; not starting.", service)
 		return false
 	}
 	_ = ip // the setting is a client allow-list; the listener takes every interface, as the release build does

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"retuner/internal/config"
+	"viritin/internal/config"
 )
 
 func TestUnsafeMACNeverEscapesCacheDir(t *testing.T) {

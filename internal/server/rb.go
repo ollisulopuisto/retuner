@@ -5,13 +5,13 @@ import (
 	"net"
 	"net/http"
 	"regexp"
-	"retuner/internal/translator"
+	"viritin/internal/translator"
 	"strings"
 
-	"retuner/internal/config"
-	"retuner/internal/radiobrowser"
-	"retuner/internal/stations"
-	"retuner/internal/vtuner"
+	"viritin/internal/config"
+	"viritin/internal/radiobrowser"
+	"viritin/internal/stations"
+	"viritin/internal/vtuner"
 )
 
 const maxMACLen = 64

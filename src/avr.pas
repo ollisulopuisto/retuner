@@ -88,7 +88,7 @@ const
   AVR_MAINMENU_IDENTIFIER_LOCAL = 'local';
   AVR_MAINMENU_IDENTIFIER_PODCASTS = 'podcasts';
   AVR_MAINMENU_IDENTIFIERS = AVR_MAINMENU_IDENTIFIER_ABOUT+';'+AVR_MAINMENU_IDENTIFIER_BOOKMARKS+';'+AVR_MAINMENU_IDENTIFIER_MYSTATIONS+';'+AVR_MAINMENU_IDENTIFIER_PODCASTS+';'+AVR_MAINMENU_IDENTIFIER_LOCAL+';'+AVR_MAINMENU_IDENTIFIER_RADIOBROWSER;
-  AVR_MAINMENU_LABELS = '*** Retuner ***;Bookmarks;My Stations;Podcasts;Local Stations;Radio Browser';
+  AVR_MAINMENU_LABELS = '*** Viritin ***;Bookmarks;My Stations;Podcasts;Local Stations;Radio Browser';
 
   MSG_AVR_MAINMENU_INCORRECT_VALUES = 'Incorrect values in avr.ini [MainMenu Items] group!';
   MSG_AVR_MAINMENU_RESTORING_VALUES = 'Restoring default values...';
@@ -250,7 +250,7 @@ begin
       if ReadString(AVR_INI_SECTION_CONFIGURATION,AVR_INI_INIVERSION,'')<>AVR_INI_VERSION then
         begin
           Logging(ltWarning, 'Your '+AAVRMAC+'.ini file is outdated! Some features may not work properly!');
-          Logging(ltWarning, 'Your '+AAVRMAC+'.ini file will be updated with new options right now. Check https://github.com/ollisulopuisto/retuner/tree/master/cfg for the description of the appropriate avr.ini file for your version of Retuner');
+          Logging(ltWarning, 'Your '+AAVRMAC+'.ini file will be updated with new options right now. Check https://github.com/ollisulopuisto/viritin/tree/master/cfg for the description of the appropriate avr.ini file for your version of Viritin');
           WriteString(AVR_INI_SECTION_CONFIGURATION,AVR_INI_INIVERSION,AVR_INI_VERSION);
         end;
 

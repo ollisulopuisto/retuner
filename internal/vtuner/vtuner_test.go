@@ -35,10 +35,10 @@ func TestStationMimeOnlyKnownCodecs(t *testing.T) {
 	}
 }
 
-func TestDirectoryAddsRetunerParameter(t *testing.T) {
+func TestDirectoryAddsViritinParameter(t *testing.T) {
 	p := &Page{TotalItemsCount: 1}
-	p.Add(Directory{Title: "t", Destination: "http://h/retuner/about", ItemCount: 2})
-	if !strings.Contains(p.XML(), "<UrlDir>http://h/retuner/about?retuner=true</UrlDir>") {
+	p.Add(Directory{Title: "t", Destination: "http://h/viritin/about", ItemCount: 2})
+	if !strings.Contains(p.XML(), "<UrlDir>http://h/viritin/about?viritin=true</UrlDir>") {
 		t.Fatal(p.XML())
 	}
 }

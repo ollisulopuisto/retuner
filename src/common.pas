@@ -28,39 +28,42 @@ type
   end;
 
 const
-  APP_NAME = 'Retuner';
+  APP_NAME = 'Viritin';
 // CalVer: YY.MM.DD.N, N being the build within that day. The date a build was
 // cut is the useful thing to know about it -- semantic versioning would promise
 // an API this has never had.
-  APP_VERSION = '26.08.28.4';
+  APP_VERSION = '26.11.07.396';
 // The YTuner release this fork started from. Separate from APP_VERSION because
 // it means something different and does not move when we cut a build: putting
-// a Retuner version in the credit line below would attribute our releases to
+// a Viritin version in the credit line below would attribute our releases to
 // Greg P., which is the opposite of the point.
   UPSTREAM_VERSION = '1.2.6';
 // Greg P. keeps his line in the banner because nearly all of this code is his.
 // The notice in LICENSE.txt is the licence requirement; this is the courtesy
 // that ought to go with it.
-  APP_COPYRIGHT = 'a fork of YTuner '+UPSTREAM_VERSION+' by Greg P. (MIT) - https://github.com/ollisulopuisto/retuner';
+  APP_COPYRIGHT = 'a fork of YTuner '+UPSTREAM_VERSION+' by Greg P. (MIT) - https://github.com/ollisulopuisto/viritin';
 // NOT CalVer, and not tied to APP_VERSION: this is compared against the
 // INIVersion= line in every existing config file. It moves only when the config
 // format actually changes, or every install is told its file is outdated.
   INI_VERSION = '1.2.2';
 
-  RETUNER_USER_AGENT = 'Retuner';
+  VIRITIN_USER_AGENT = 'Viritin';
+  RETUNER_USER_AGENT = VIRITIN_USER_AGENT;
 
-  CONFIG_FILE_NAME = 'retuner.ini';
-// What the file was called before the rename. Renamed to the above on first
+  CONFIG_FILE_NAME = 'viritin.ini';
+// What the file was called before the renames. Renamed to the above on first
 // start so an existing install keeps its settings; see MigrateLegacyConfig.
-  CONFIG_FILE_NAME_LEGACY = 'ytuner.ini';
+  CONFIG_FILE_NAME_LEGACY = 'retuner.ini';
+  CONFIG_FILE_NAME_LEGACY_YTUNER = 'ytuner.ini';
 // Bookmark files store the host as a placeholder and get the real one put back
 // when they are read. New files are written with this.
-  BOOKMARK_HOST = 'retunerhost';
-// What files written before the rename carry. Accepted on read and never
+  BOOKMARK_HOST = 'viritinhost';
+// What files written before the renames carry. Accepted on read and never
 // written, so an AVR's existing bookmarks keep resolving and quietly convert to
 // the new placeholder the next time they are saved. See SubstHost in
 // bookmark.pas -- dropping this would orphan every bookmark already stored.
-  BOOKMARK_HOST_LEGACY = 'ytunerhost';
+  BOOKMARK_HOST_LEGACY = 'retunerhost';
+  BOOKMARK_HOST_LEGACY_YTUNER = 'ytunerhost';
 
   LOG_TYPE_MSG : array[TLogType] of string = ('','Inf','Wrn','Err','Dbg');
 
@@ -100,11 +103,11 @@ const
   MSG_RBUUID_CACHE_FILE = 'RB UUIDs cache file';
 
   MSG_INI_WARNING1 = 'You are running out of INI file! Some features may not work properly!';
-  MSG_INI_WARNING2 = 'Your retuner.ini file is outdated! Some features may not work properly!';
-  MSG_INI_WARNING3 = 'Retuner will try to fill in the missing options, but check their description and usage on https://github.com/ollisulopuisto/retuner/tree/master/cfg.';
+  MSG_INI_WARNING2 = 'Your viritin.ini file is outdated! Some features may not work properly!';
+  MSG_INI_WARNING3 = 'Viritin will try to fill in the missing options, but check their description and usage on https://github.com/ollisulopuisto/viritin/tree/master/cfg.';
   MSG_VTUNER_ERROR_LINK1 = 'Obslolete vTuner radio station link - trying redirect to ';
   MSG_VTUNER_ERROR_LINK2 = 'Obslolete vTuner radio station link can not be resolved - trying redirect to your first radio station of stations.ini/yaml file.';
-  MSG_FIRST_STATION_NEEDED = 'Be sure you have at least one category and one (first one) radio station DIRECT link in stations.ini/yaml file and option "Enable=1" is placed in "[MyStations]" section of retuner.ini file .';
+  MSG_FIRST_STATION_NEEDED = 'Be sure you have at least one category and one (first one) radio station DIRECT link in stations.ini/yaml file and option "Enable=1" is placed in "[MyStations]" section of viritin.ini file .';
   MSG_REDIRECT_SUPPORT_NEEDED = 'Your AVR must support HTTP redirects! See "RedirectHTTPCode" option.';
 
   INI_CONFIGURATION = 'Configuration';
@@ -722,7 +725,7 @@ begin
     with TLocalHttpClient.Create(PLAYLIST_MAX_BYTES) do
       try
         AllowRedirect:=True;
-        AddHeader(HTTP_HEADER_USER_AGENT,RETUNER_USER_AGENT+'/'+APP_VERSION);
+        AddHeader(HTTP_HEADER_USER_AGENT,VIRITIN_USER_AGENT+'/'+APP_VERSION);
         try
           Get(AURL,LStream);
         except

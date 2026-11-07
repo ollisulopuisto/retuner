@@ -1,6 +1,6 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Retuner remote</title><style>
+<title>Viritin remote</title><style>
 :root{--bg:#f6f5f2;--card:#fff;--ink:#1c2530;--soft:#5b6875;--line:#dcd8d0;--accent:#0e7d86;--danger:#b3261e}
 @media(prefers-color-scheme:dark){:root{--bg:#151b21;--card:#1d252d;--ink:#e6ebef;--soft:#a3aeb8;--line:#2d3742;--accent:#3fc1cb;--danger:#ff8a80}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
@@ -19,8 +19,8 @@ button:active{background:var(--accent);color:#fff}
 .wide{grid-column:1/4}
 form{display:flex;gap:8px;margin:0}input{flex:1;font:inherit;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
 .err{color:var(--danger);font-size:14px;padding:8px 12px}
-</style></head><body id="retuner-remote"><div class="wrap">
-<h1>Retuner remote</h1>
+</style></head><body id="viritin-remote"><div class="wrap">
+<h1>Viritin remote</h1>
 <p class="sub">The list your receiver is showing. Click a line to go to it; arrow keys and Enter work too.</p>
 <div class="card"><div id="list"></div><div class="page" id="page"></div></div>
 <div class="card"><form id="search" autocomplete="off">
@@ -48,14 +48,14 @@ function draw(d){
  pageEl.textContent=d.page||"";}
 function poll(){fetch("api/remote/status",{credentials:"same-origin"})
  .then(function(r){return r.json();}).then(draw)
- .catch(function(){show("Cannot reach Retuner.");});}
+ .catch(function(){show("Cannot reach Viritin.");});}
 function select(i,row){
  row.classList.add("busy");
  fetch("api/remote/select",{method:"POST",credentials:"same-origin",
   headers:{"Content-Type":"application/json"},body:JSON.stringify({index:i})})
  .then(function(r){return r.json();})
  .then(function(d){if(!d.ok)show(d.error||"Refused.");setTimeout(poll,500);})
- .catch(function(){show("Cannot reach Retuner.");});}
+ .catch(function(){show("Cannot reach Viritin.");});}
 function send(c){fetch("api/remote/cmd",{method:"POST",credentials:"same-origin",
  headers:{"Content-Type":"application/json"},body:JSON.stringify({cmd:c})})
  .then(function(r){return r.json();})

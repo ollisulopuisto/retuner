@@ -195,7 +195,7 @@ begin
   LClient:=TLocalHttpClient.Create(PODCAST_MAX_BYTES);
   try
     LClient.AllowRedirect:=True;
-    LClient.AddHeader(HTTP_HEADER_USER_AGENT,RETUNER_USER_AGENT+'/'+APP_VERSION);
+    LClient.AddHeader(HTTP_HEADER_USER_AGENT,VIRITIN_USER_AGENT+'/'+APP_VERSION);
     try
       LClient.Get(AURL,AStream);
       Result:=AStream.Size>0;

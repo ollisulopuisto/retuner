@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"retuner/internal/fpjson"
+	"viritin/internal/fpjson"
 )
 
 const (
@@ -24,7 +24,7 @@ const (
 	flagSelect   = 1
 	flagCursor   = 8
 	maxQuery     = 30
-	noAddress    = "No receiver address configured. Set RemoteAVRAddress in retuner.ini."
+	noAddress    = "No receiver address configured. Set RemoteAVRAddress in viritin.ini."
 	noList       = "The receiver did not return a list."
 )
 

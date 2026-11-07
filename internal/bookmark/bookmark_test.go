@@ -12,7 +12,7 @@ func newStore(t *testing.T) *Store {
 }
 
 func item(id string) Item {
-	return Item{ID: id, Name: "n", URL: "http://u", Logo: "http://10.0.0.5/retuner/icon?id=x", Relia: "3",
+	return Item{ID: id, Name: "n", URL: "http://u", Logo: "http://10.0.0.5/viritin/icon?id=x", Relia: "3",
 		Bookmark: "http://10.0.0.5/setupapp/favxml.asp?id=x&fav=add"}
 }
 
@@ -21,7 +21,7 @@ func TestAddStoresPortableHostAndDelLink(t *testing.T) {
 	s.Set("m", "add", item("MSB1"))
 	raw, _ := os.ReadFile(filepath.Join(s.Dir, "bookmark.xml"))
 	x := string(raw)
-	if !strings.Contains(x, "http://retunerhost/retuner/icon") || !strings.Contains(x, "fav=del") || strings.Contains(x, "10.0.0.5") {
+	if !strings.Contains(x, "http://viritinhost/viritin/icon") || !strings.Contains(x, "fav=del") || strings.Contains(x, "10.0.0.5") {
 		t.Fatal(x)
 	}
 	if s.Count("m") != 1 {
@@ -49,7 +49,7 @@ func TestServedHostIsSubstituted(t *testing.T) {
 	s := newStore(t)
 	s.Set("m", "add", item("MSB1"))
 	body, ok := s.StationInfo("m", "MSB1")
-	if !ok || !strings.Contains(string(body), "http://10.0.0.5/retuner/icon") {
+	if !ok || !strings.Contains(string(body), "http://10.0.0.5/viritin/icon") {
 		t.Fatal(string(body))
 	}
 }
@@ -105,6 +105,19 @@ func TestRenderEquivalence(t *testing.T) {
 	}
 }
 
+func TestLegacyHostsSubstituted(t *testing.T) {
+	s := &Store{URLHost: "192.168.1.50"}
+	if got := s.subst("http://retunerhost/retuner/icon"); got != "http://192.168.1.50/retuner/icon" {
+		t.Fatalf("retunerhost substitution failed: %s", got)
+	}
+	if got := s.subst("http://ytunerhost/ytuner/icon"); got != "http://192.168.1.50/ytuner/icon" {
+		t.Fatalf("ytunerhost substitution failed: %s", got)
+	}
+	if got := s.subst("http://viritinhost/viritin/icon"); got != "http://192.168.1.50/viritin/icon" {
+		t.Fatalf("viritinhost substitution failed: %s", got)
+	}
+}
+
 func BenchmarkRender(b *testing.B) {
 	items := make([]Item, 100)
 	for i := 0; i < 100; i++ {
@@ -113,13 +126,13 @@ func BenchmarkRender(b *testing.B) {
 			Name:      "Rock & Roll <Favorites>",
 			URL:       "http://stream.example.com/live?id=1&token=xyz",
 			Desc:      "Classic & Hard Rock",
-			Logo:      "http://retunerhost/retuner/icon?id=123",
+			Logo:      "http://viritinhost/viritin/icon?id=123",
 			Format:    "Rock",
 			Location:  "New York, USA",
 			Bandwidth: "320",
 			Mime:      "MP3",
 			Relia:     "3",
-			Bookmark:  "http://retunerhost/setupapp/favxml.asp?id=123&fav=del",
+			Bookmark:  "http://viritinhost/setupapp/favxml.asp?id=123&fav=del",
 		}
 	}
 

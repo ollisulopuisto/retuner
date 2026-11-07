@@ -1,4 +1,4 @@
-// Package config reads retuner.ini and avr.ini with the same defaults, key
+// Package config reads viritin.ini and avr.ini with the same defaults, key
 // order and "fill what is missing, keep what is there" behaviour as the
 // Pascal build (src/common.pas, src/avr.pas).
 package config
@@ -16,11 +16,11 @@ import (
 )
 
 const (
-	AppName         = "Retuner"
-	AppVersion      = "26.08.28.4" // kept equal to the Pascal build under comparison
+	AppName         = "Viritin"
+	AppVersion      = "26.11.07.396" // kept equal to the Pascal build under comparison
 	UpstreamVersion = "1.2.6"
 	IniVersion      = "1.2.2"
-	AppCopyright    = "a fork of YTuner " + UpstreamVersion + " by Greg P. (MIT) - https://github.com/ollisulopuisto/retuner"
+	AppCopyright    = "a fork of YTuner " + UpstreamVersion + " by Greg P. (MIT) - https://github.com/ollisulopuisto/viritin"
 )
 
 type kv struct{ k, v string }
@@ -65,7 +65,7 @@ func findKey(sec *ini.Section, name string) *ini.Key {
 var defaults = []section{
 	{"Configuration", []kv{{"MessageInfoLevel", "4"}, {"INIVersion", IniVersion}, {"IPAddress", "default"}, {"ActAsHost", "default"}, {"UseSSL", "1"}, {"ResolvePlaylists", "0"}, {"LocalCountry", ""}, {"RelayHTTPS", "0"}, {"RelayPort", "8888"}, {"RedirectHTTPCode", "302"}, {"IconSize", "200"}, {"IconCache", "1"}, {"IconEndPointExtension", ""}, {"MyToken", "0123456789ABCDEF"}, {"CommonAVRini", "1"}, {"CacheFolderLocation", "default"}, {"ConfigFolderLocation", "default"}, {"DBFolderLocation", "default"}, {"DBLibFile", "default"}}},
 	{"MyStations", []kv{{"Enable", "1"}, {"MyStationsFile", "stations.ini"}, {"MyStationsAutoRefreshPeriod", "0"}}},
-	{"Presets", []kv{{"Enable", "0"}, {"PresetsCountries", "default"}, {"PresetsURL", "https://raw.githubusercontent.com/ollisulopuisto/retuner/master/presets"}, {"PresetsAutoRefreshPeriod", "0"}}},
+	{"Presets", []kv{{"Enable", "0"}, {"PresetsCountries", "default"}, {"PresetsURL", "https://raw.githubusercontent.com/ollisulopuisto/viritin/master/presets"}, {"PresetsAutoRefreshPeriod", "0"}}},
 	{"Podcasts", []kv{{"Enable", "0"}, {"PodcastsFile", "podcasts.ini"}, {"PodcastEpisodesLimit", "100"}, {"PodcastCacheTTL", "60"}}},
 	{"RadioBrowser", []kv{{"Enable", "1"}, {"RBAPIURL", "http://all.api.radio-browser.info"}, {"RBPopularAndSearchStationsLimit", "100"}, {"RBMinStationsPerCategory", "3"}, {"RBUUIDsCacheTTL", "0"}, {"RBUUIDsCacheAutoRefresh", "0"}, {"RBCacheTTL", "0"}, {"RBCacheType", "catFile"}}},
 	{"Bookmark", []kv{{"Enable", "1"}, {"CommonBookmark", "1"}, {"BookmarkStationsLimit", "100"}}},
@@ -161,11 +161,11 @@ func Load(path string) (*Config, error) {
 	if sec := findSection(f, "Configuration"); sec == nil || findKey(sec, "INIVersion") == nil {
 		if _, err := os.Stat(path); err == nil {
 			log.Printf("WARNING: You are running out of INI file! Some features may not work properly!")
-			log.Printf("WARNING: Retuner will try to fill in the missing options, but check their description and usage on https://github.com/ollisulopuisto/retuner/tree/master/cfg.")
+			log.Printf("WARNING: Viritin will try to fill in the missing options, but check their description and usage on https://github.com/ollisulopuisto/viritin/tree/master/cfg.")
 		}
 	} else if v := findKey(sec, "INIVersion"); v.String() != IniVersion {
-		log.Printf("WARNING: Your retuner.ini file is outdated! Some features may not work properly!")
-		log.Printf("WARNING: Retuner will try to fill in the missing options, but check their description and usage on https://github.com/ollisulopuisto/retuner/tree/master/cfg.")
+		log.Printf("WARNING: Your viritin.ini file is outdated! Some features may not work properly!")
+		log.Printf("WARNING: Viritin will try to fill in the missing options, but check their description and usage on https://github.com/ollisulopuisto/viritin/tree/master/cfg.")
 		v.SetValue(IniVersion)
 		changed = true
 	}
@@ -359,7 +359,7 @@ func filterList(raw string) []string {
 const avrIniVersion = "1.0.2"
 
 var defaultMenuIDs = []string{"about", "bookmarks", "mystations", "podcasts", "local", "radiobrowser"}
-var defaultMenuLabels = []string{"*** Retuner ***", "Bookmarks", "My Stations", "Podcasts", "Local Stations", "Radio Browser"}
+var defaultMenuLabels = []string{"*** Viritin ***", "Bookmarks", "My Stations", "Podcasts", "Local Stations", "Radio Browser"}
 
 var avrDefaults = []section{
 	{"Configuration", []kv{{"INIVersion", avrIniVersion}, {"Protocol", "all-as-http"}}},
@@ -419,7 +419,7 @@ func (c *Config) LoadAVRFile(name string) (*AVR, error) {
 	avrVerKey := findKey(ensureSection(f, "Configuration"), "INIVersion")
 	if v := avrVerKey; v != nil && v.String() != avrIniVersion {
 		log.Printf("WARNING: Your %s file is outdated! Some features may not work properly!", name)
-		log.Printf("WARNING: Your %s file will be updated with new options right now. Check https://github.com/ollisulopuisto/retuner/tree/master/cfg for the description of the appropriate avr.ini file for your version of Retuner", name)
+		log.Printf("WARNING: Your %s file will be updated with new options right now. Check https://github.com/ollisulopuisto/viritin/tree/master/cfg for the description of the appropriate avr.ini file for your version of Viritin", name)
 		v.SetValue(avrIniVersion)
 		changed = true
 	} else if avrVerKey == nil {

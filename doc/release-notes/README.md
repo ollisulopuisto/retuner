@@ -6,5 +6,5 @@ generated commit list if it does not — which answers "what changed" but not
 "should I install this", and the second question is the one a person opening a
 release page is asking.
 
-Write it for someone who runs Retuner, not for someone who reads the diff: what
+Write it for someone who runs Viritin, not for someone who reads the diff: what
 they get, what they have to set to get it, and what upgrading costs them.

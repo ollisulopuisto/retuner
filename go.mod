@@ -1,4 +1,4 @@
-module retuner
+module viritin
 
 go 1.26.0
 

@@ -1,9 +1,9 @@
 #!/bin/sh
-# Update an installed Retuner to the latest release, and put the old one back
+# Update an installed Viritin to the latest release, and put the old one back
 # if the new one does not come up.
 #
-#   sudo ./retuner-update.sh            # update if there is a newer release
-#   sudo ./retuner-update.sh --check    # say what would happen, change nothing
+#   sudo ./viritin-update.sh            # update if there is a newer release
+#   sudo ./viritin-update.sh --check    # say what would happen, change nothing
 #
 # Environment: PREFIX (default /usr/local/retuner), REPO, SERVICE, RESTART_CMD.
 #
@@ -12,15 +12,15 @@
 # otherwise leave the receiver with no station list until somebody visits.
 set -eu
 
-REPO=${REPO:-ollisulopuisto/retuner}
-PREFIX=${PREFIX:-/usr/local/retuner}
-SERVICE=${SERVICE:-io.github.ollisulopuisto.retuner}
+REPO=${REPO:-ollisulopuisto/viritin}
+PREFIX=${PREFIX:-/usr/local/viritin}
+SERVICE=${SERVICE:-io.github.ollisulopuisto.viritin}
 API=${API:-https://api.github.com}
 DOWNLOAD=${DOWNLOAD:-https://github.com}
 CHECK_ONLY=0
 [ "${1:-}" = "--check" ] && CHECK_ONLY=1
 
-say() { echo "$(date '+%Y-%m-%d %H:%M:%S') retuner-update: $*"; }
+say() { echo "$(date '+%Y-%m-%d %H:%M:%S') viritin-update: $*"; }
 die() { say "$*" >&2; exit 1; }
 
 # Which archive this machine wants. The target triple is what the build script
@@ -37,7 +37,7 @@ case "$(uname -m)" in
 esac
 TARGET="$cpu-$os"
 
-[ -x "$PREFIX/retuner" ] || die "no installed binary at $PREFIX/retuner"
+[ -x "$PREFIX/viritin" ] || die "no installed binary at $PREFIX/viritin"
 
 # The installed version. Written here on every successful update; absent on an
 # install that predates this script, which is treated as "unknown, so update".
@@ -63,7 +63,7 @@ if [ "$CHECK_ONLY" = 1 ]; then
   exit 0
 fi
 
-ASSET="retuner-$LATEST-$TARGET.tar.gz"
+ASSET="viritin-$LATEST-$TARGET.tar.gz"
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT INT TERM
 
@@ -101,7 +101,7 @@ else
 fi
 
 tar -xzf "$WORK/$ASSET" -C "$WORK" || die "archive did not extract"
-NEW="$WORK/retuner-$LATEST-$TARGET/retuner"
+NEW="$WORK/viritin-$LATEST-$TARGET/viritin"
 [ -x "$NEW" ] || die "no binary inside the archive at $NEW"
 
 # Prove the new binary serves before it becomes the installed one. A build that
@@ -109,8 +109,8 @@ NEW="$WORK/retuner-$LATEST-$TARGET/retuner"
 # out here costs nothing.
 PROBE_PORT=${PROBE_PORT:-18999}
 mkdir -p "$WORK/probe/config"
-cp "$NEW" "$WORK/probe/retuner"
-cat > "$WORK/probe/retuner.ini" <<INI
+cp "$NEW" "$WORK/probe/viritin"
+cat > "$WORK/probe/viritin.ini" <<INI
 [Configuration]
 INIVersion=1.2.2
 MessageInfoLevel=4
@@ -128,7 +128,7 @@ INI
 # exec: $! must be the probe itself, or the kill below leaves it running and
 # holding PROBE_PORT, and the next update run finds the port busy. bash on
 # macOS does not fold this into an exec on its own.
-( cd "$WORK/probe" && exec ./retuner > probe.log 2>&1 ) &
+( cd "$WORK/probe" && exec ./viritin > probe.log 2>&1 ) &
 probe_pid=$!
 probe_ok=0
 i=0
@@ -152,7 +152,7 @@ say "the new binary serves"
 # Where the service answers, so the health check below asks the right socket.
 #
 # "default" does NOT mean loopback, and reading it that way rolled back a good
-# update on a real install: Retuner resolves default to the machine's LAN
+# update on a real install: Viritin resolves default to the machine's LAN
 # address and binds that one specifically (Application.Address), so nothing is
 # listening on 127.0.0.1 at all. The check then failed, the update was undone,
 # and the rollback "failed" too - because both probes asked an address the
@@ -160,10 +160,10 @@ say "the new binary serves"
 #
 # So ask every address it could be on and accept any of them. The log is the
 # ground truth: it prints the address it actually bound.
-port=$(sed -n 's/^WebServerPort=//p' "$PREFIX/retuner.ini" 2>/dev/null | head -1)
+port=$(sed -n 's/^WebServerPort=//p' "$PREFIX/viritin.ini" 2>/dev/null | head -1)
 [ -n "$port" ] || port=80
-cfg_host=$(sed -n 's/^WebServerIPAddress=//p' "$PREFIX/retuner.ini" 2>/dev/null | head -1)
-LOGFILE=${LOGFILE:-$PREFIX/retuner.log}
+cfg_host=$(sed -n 's/^WebServerIPAddress=//p' "$PREFIX/viritin.ini" 2>/dev/null | head -1)
+LOGFILE=${LOGFILE:-$PREFIX/viritin.log}
 
 candidate_hosts() {
   # Newest first: what the running service last said it bound.
@@ -207,15 +207,15 @@ healthy() {
   return 1
 }
 
-# Only the binary is replaced. retuner.ini and config/ are the user's, and the
+# Only the binary is replaced. viritin.ini and config/ are the user's, and the
 # archive carries its own copies of both - copying those over an install is how
 # somebody's filters, stations and podcasts would silently revert to the
 # shipped defaults on a routine update.
 say "installing $LATEST"
-cp "$PREFIX/retuner" "$PREFIX/retuner.previous"
-cp "$NEW" "$PREFIX/retuner.new"
-chmod +x "$PREFIX/retuner.new"
-mv "$PREFIX/retuner.new" "$PREFIX/retuner"
+cp "$PREFIX/viritin" "$PREFIX/viritin.previous"
+cp "$NEW" "$PREFIX/viritin.new"
+chmod +x "$PREFIX/viritin.new"
+mv "$PREFIX/viritin.new" "$PREFIX/viritin"
 restart
 
 if healthy; then
@@ -225,7 +225,7 @@ if healthy; then
 fi
 
 say "the service did not answer after the update; rolling back"
-cp "$PREFIX/retuner.previous" "$PREFIX/retuner"
+cp "$PREFIX/viritin.previous" "$PREFIX/viritin"
 restart
 if healthy; then
   say "rolled back to $INSTALLED"

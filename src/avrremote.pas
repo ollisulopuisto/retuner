@@ -196,7 +196,7 @@ var
   i, LFlag: integer;
 begin
   if RemoteBaseURL.IsEmpty then
-    Exit(RemoteErrorAsJSON('No receiver address configured. Set RemoteAVRAddress in retuner.ini.'));
+    Exit(RemoteErrorAsJSON('No receiver address configured. Set RemoteAVRAddress in viritin.ini.'));
 
   LXML:='';
   LClient:=NewClient;
@@ -282,7 +282,7 @@ var
 begin
   Result:='';
   if RemoteBaseURL.IsEmpty then
-    Exit('No receiver address configured. Set RemoteAVRAddress in retuner.ini.');
+    Exit('No receiver address configured. Set RemoteAVRAddress in viritin.ini.');
 
   LClient:=NewClient;
   LResponse:=TStringStream.Create('');
@@ -366,7 +366,7 @@ var
   LCommand, LError: string;
 begin
   if RemoteBaseURL.IsEmpty then
-    Exit('No receiver address configured. Set RemoteAVRAddress in retuner.ini.');
+    Exit('No receiver address configured. Set RemoteAVRAddress in viritin.ini.');
   if (AIndex<0) or (AIndex>=AVRREMOTE_LINES) then
     Exit('There is no line '+IntToStr(AIndex)+'.');
 
