@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/).
 
+## [26.11.07.400] - 2026-11-07
+
+### Changed
+- Updated standalone, Docker, macOS, and MikroTik documentation to reflect pure-Go build instructions.
+- Removed obsolete `--pascal` option and include generator from `script/make-icon.py`.
+- Updated developer documentation in `CLAUDE.md`.
+
 ## [26.11.07.398] - 2026-11-07
 
 ### Removed

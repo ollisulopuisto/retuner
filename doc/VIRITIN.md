@@ -33,7 +33,7 @@ The obvious names are all taken, and two of them are taken in ways that matter.
 
 Done:
 
-- **Builds on stock FPC** — `script/build.sh` needs no Lazarus IDE, `script/smoke-test.sh` checks the binary actually serves, and both run in CI on every push.
+- **Go implementation** — clean pure-Go build (Go 1.24+), `script/build.sh` needs no external C/FPC dependencies, and CI builds and tests across Linux, macOS, and Windows.
 - **The stall fixes** — single-fetch API calls, timeouts on every outbound request, correct icon encoding.
 - **Thread safety** — the caches, the database connection, the station list and the per-AVR config are no longer reached unsynchronised from several request threads.
 - **Playlist resolution** (`ResolvePlaylists`, off by default) — unwraps `.m3u`, `.pls`, `.asx` and `.xspf` links to the stream behind them, for firmware that cannot follow a playlist.
@@ -59,8 +59,8 @@ Under consideration:
 
 See the Build section of the [README](../README.md). In short:
 
-```
-sudo apt install fp-compiler fp-units-fcl fp-units-net fp-units-db fp-units-misc lazarus-src zip git
+```sh
+sudo apt install golang-go git
 ./script/build.sh
 ./script/smoke-test.sh
 ```

@@ -100,11 +100,8 @@ reads (log lines, warnings, UI, docs) says Viritin. YTuner stays where it is
 attribution or history: the README and `LICENSE.txt` credit, the program header,
 `APP_COPYRIGHT`, `UPSTREAM_VERSION`, links to upstream issues. vTuner stays
 wherever it names the service Viritin replaces, including the `*.vtuner.com`
-hostnames the DNS setup points at this machine. Compatibility strings (`/ytuner/`,
-`ytunerhost`, `ytuner.ini`) stay as above. The Lazarus project files keep their
-`ytuner.*` names. Last audit 2026-11-01: only the "outdated avr.ini" warning
-(Go and Pascal) still said YTuner, now fixed. CI builds and tests the Go port only;
-a change under `src/` is not compiled by any workflow here.
+hostnames the DNS setup points at this machine. Compatibility strings (`/ytuner/`, `ytunerhost`, `ytuner.ini`) stay as above. CI builds and tests the Go port;
+the legacy Pascal implementation was decommissioned in v26.11.07.398.
 
 **Which AVR config file is live depends on `CommonAVRini`, and the default is
 `avr.ini`.** Shipped as `CommonAVRini=1`, and `True` in the code as well, which
@@ -123,11 +120,10 @@ so the service assumes it is reachable on port 80 at `act_as_host`. Changing
 `WebServerPort` alone does not move it; it only stops it answering where it says
 it is.
 
-**The intercept list is written down in three places.** `INTERCEPT_DNS` in
-`src/dnsserver.pas`, `InterceptDNs=` in `cfg/viritin.ini`, and the dnsmasq block
-in `doc/APPLIANCE.md`. A domain added to one and not the others is a
-manufacturer that quietly stops working. `fuzz-test.sh` compares the last two
-and queries the first, so all three go red together.
+**The intercept list is written down in two places.** `InterceptDNs=` in
+`cfg/viritin.ini`, and the dnsmasq block in `doc/APPLIANCE.md`. A domain added to
+one and not the other is a manufacturer that quietly stops working. `fuzz-test.sh`
+compares both, so they stay in sync.
 
 **A backgrounded subshell is not the process you killed.** `( cd "$WORK" &&
 ./viritin > log 2>&1 ) &` sets `$!` to the subshell, not the server. Linux hides

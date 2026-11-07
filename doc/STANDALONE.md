@@ -43,9 +43,7 @@ which is worth something on a box that also runs your house.
 
 ## The machine
 
-Any Linux that ships Free Pascal 3.2.2: Debian, Ubuntu, Raspberry Pi OS. On
-Apple Silicon under VMware Fusion or UTM, use the arm64 image and build there;
-the build script targets whatever compiler it finds.
+Any Linux system supported by Go: Debian, Ubuntu, Raspberry Pi OS, etc.
 
 **Bridge the network adapter.** NAT will not do — the receiver has to reach this
 machine directly on the LAN, and it will be told an address that has to work
@@ -59,10 +57,9 @@ receiver just shows an empty menu.
 ## Build and install
 
 ```sh
-sudo apt install -y fp-compiler fp-units-fcl fp-units-net fp-units-db \
-                    fp-units-misc lazarus-src zip git
-git clone https://github.com/ollisulopuisto/viritin ~/retuner
-cd ~/retuner && ./script/build.sh          # Indy is fetched on the first run
+sudo apt install -y golang-go git
+git clone https://github.com/ollisulopuisto/viritin ~/viritin
+cd ~/viritin && ./script/build.sh
 ```
 
 Lay the runtime directory out the way the README describes, with the binary and
@@ -70,10 +67,10 @@ its ini side by side:
 
 ```sh
 sudo mkdir -p /opt/viritin/config /opt/viritin/cache
-sudo cp bin/*/retuner cfg/viritin.ini /opt/viritin/
+sudo cp bin/*/viritin cfg/viritin.ini /opt/viritin/
 sudo cp cfg/avr.ini /opt/viritin/config/
-sudo useradd -r -s /usr/sbin/nologin retuner
-sudo chown -R retuner:retuner /opt/viritin
+sudo useradd -r -s /usr/sbin/nologin viritin
+sudo chown -R viritin:viritin /opt/viritin
 ```
 
 Then edit `/opt/viritin/viritin.ini`. The settings that matter for this layout:
@@ -100,8 +97,8 @@ file could reach.
 ```sh
 sudo cp doc/viritin.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now retuner
-journalctl -u retuner -f
+sudo systemctl enable --now viritin
+journalctl -u viritin -f
 ```
 
 If you change `RestrictAddressFamilies`, keep `AF_NETLINK`. Every `default` in
@@ -114,9 +111,9 @@ Running from a clone means an update is a pull and a rebuild. The ini in
 `/opt/viritin` is untouched by it.
 
 ```sh
-cd ~/retuner && git pull && ./script/build.sh
-sudo install -o retuner -g retuner bin/*/retuner /opt/viritin/retuner
-sudo systemctl restart retuner
+cd ~/viritin && git pull && ./script/build.sh
+sudo install -o viritin -g viritin bin/*/viritin /opt/viritin/viritin
+sudo systemctl restart viritin
 ```
 
 ## Checking it works, in an order that localises a failure

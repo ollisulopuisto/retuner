@@ -19,30 +19,19 @@ You do not have to. Every change publishes a built `aarch64-darwin` (and
 `x86_64-darwin`) tarball — see the Actions tab, or a release — and extracting one
 skips this whole section. Build from source when you want to change something.
 
-You need FPC 3.2.2, the LazUtils sources, `git` and `zip`.
-
-* **FPC** — the installer from [freepascal.org](https://www.freepascal.org/download.html)
-  covers Intel and Apple Silicon. `fpc -iTP` and `fpc -iTO` should answer
-  `aarch64` and `darwin` on Apple Silicon. Homebrew's `fpc` works too if it
-  gives you a native compiler.
-* **LazUtils** — install Lazarus (it lands in `/Applications/Lazarus`) or
-  `brew install lazarus`. `script/build.sh` looks in both, plus the Homebrew
-  prefixes. If yours is elsewhere: `LAZUTILS_DIR=/path/to/lazutils ./script/build.sh`.
-* **git and zip** come with the Xcode command line tools: `xcode-select --install`.
+You need Go (1.24+) and `git`:
 
 ```sh
-git clone https://github.com/ollisulopuisto/viritin ~/retuner
-cd ~/retuner && ./script/build.sh          # -> bin/aarch64-darwin/retuner
+brew install go git
+git clone https://github.com/ollisulopuisto/viritin ~/viritin
+cd ~/viritin && ./script/build.sh          # -> bin/aarch64-darwin/viritin
 ```
-
-The release build leaves out `-Xs`, which strips by passing `-s` to the linker —
-Apple's no longer takes it. Run `strip` yourself if the few megabytes matter.
 
 ## Install it
 
 ```sh
 sudo mkdir -p /usr/local/viritin/config /usr/local/viritin/cache
-sudo cp bin/aarch64-darwin/retuner cfg/viritin.ini /usr/local/viritin/
+sudo cp bin/aarch64-darwin/viritin cfg/viritin.ini /usr/local/viritin/
 sudo cp cfg/avr.ini /usr/local/viritin/config/
 ```
 

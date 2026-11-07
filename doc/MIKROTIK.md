@@ -30,13 +30,12 @@ On any x86_64 Linux machine with Docker (buildx), no ARM emulation needed:
 $ cd mikrotik
 $ ./build.sh arm64
 ...
--rw------- 1 user user 108M retuner-arm64.tar
+-rw------- 1 user user 18M viritin-arm64.tar
 ```
-The first build takes a few minutes, because it builds an ARM64 cross compiler from the Free Pascal 3.2.2 release (Debian ships only the native one). Later builds reuse it from the Docker build cache.
 
 Use `./build.sh amd64` for x86/CHR routers, or to test the image on your PC first:
 ```
-$ docker run --rm -p 8080:80 -v /tmp/retuner-data:/data retuner:amd64
+$ docker run --rm -p 8080:80 -v /tmp/viritin-data:/data viritin:amd64
 ```
 ### 2) Install the container package
 Download the `container` package matching your RouterOS version and architecture and reboot:
