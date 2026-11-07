@@ -155,5 +155,8 @@ func TestWebGUISecurityHeaders(t *testing.T) {
 		if csp := w.Header().Get("Content-Security-Policy"); !strings.Contains(csp, "default-src 'self'") {
 			t.Errorf("%s: expected Content-Security-Policy header with default-src 'self', got %q", p, csp)
 		}
+		if rp := w.Header().Get("Referrer-Policy"); rp != "no-referrer" {
+			t.Errorf("%s: expected Referrer-Policy: no-referrer, got %q", p, rp)
+		}
 	}
 }
