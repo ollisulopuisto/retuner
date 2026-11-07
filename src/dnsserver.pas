@@ -31,7 +31,7 @@ const
 // under those names -- so intercepting them by default would break devices that
 // work today. Owners whose brand was dropped in the handover are the ones who
 // may want the name; they add it by hand. See doc/OTHER-PORTALS.md.
-// This must stay in step with InterceptDNs in cfg/retuner.ini: the Home
+// This must stay in step with InterceptDNs in cfg/viritin.ini: the Home
 // Assistant add-on does not write that key, so this constant is what its users
 // actually get.
 // radiodenon.com and radioharmankardon.com were added on DNS evidence rather

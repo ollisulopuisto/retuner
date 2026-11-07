@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"retuner/internal/config"
+	"viritin/internal/config"
 )
 
 func dbMock(t *testing.T) (*httptest.Server, *int64) {

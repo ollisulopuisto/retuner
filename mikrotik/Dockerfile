@@ -1,5 +1,5 @@
-# Retuner container image for MikroTik RouterOS (RB5009 = linux/arm64).
-# Retuner is compiled from this repository's source on an x86_64 build host
+# Viritin container image for MikroTik RouterOS (RB5009 = linux/arm64).
+# Viritin is compiled from this repository's source on an x86_64 build host
 # (cross-compiled for arm64), so no ARM emulation is needed. The runtime
 # libraries are fetched as .deb files and unpacked, so the final stage
 # contains no RUN steps either.
@@ -50,7 +50,7 @@ RUN set -e; \
       *) echo "unsupported arch $TARGETARCH"; exit 1 ;; \
     esac; \
     INDY_DIR=/opt/indy/Lib /build/script/build.sh; \
-    cp /build/bin/*/retuner /build/retuner
+    cp /build/bin/*/viritin /build/viritin
 
 FROM --platform=$BUILDPLATFORM debian:bookworm-slim AS fetch
 ARG TARGETARCH
@@ -71,21 +71,21 @@ RUN set -e; \
     mkdir -p /rootfs/etc/ssl/certs; cp /etc/ssl/certs/ca-certificates.crt /rootfs/etc/ssl/certs/
 COPY cfg /tmp/cfg
 # Keep all persistent state under /data (the RouterOS mount). DNS interception
-# is done by RouterOS static DNS entries, so Retuner's own DNS service is off.
+# is done by RouterOS static DNS entries, so Viritin's own DNS service is off.
 RUN set -e; \
-    mkdir -p /rootfs/opt/retuner/defaults/config; \
+    mkdir -p /rootfs/opt/viritin/defaults/config; \
     cp /tmp/cfg/avr.ini /tmp/cfg/avr.ini.example /tmp/cfg/stations.ini /tmp/cfg/stations.yaml \
-       /tmp/cfg/podcasts.ini /rootfs/opt/retuner/defaults/config/; \
+       /tmp/cfg/podcasts.ini /rootfs/opt/viritin/defaults/config/; \
     sed -e 's|^CacheFolderLocation=.*|CacheFolderLocation=/data|' \
         -e 's|^ConfigFolderLocation=.*|ConfigFolderLocation=/data|' \
         -e 's|^DBFolderLocation=.*|DBFolderLocation=/data|' \
         -e 's|^MessageInfoLevel=.*|MessageInfoLevel=1|' \
         -e '/^\[DNSServer\]/,/^\[/ s|^Enable=1|Enable=0|' \
-        /tmp/cfg/retuner.ini > /rootfs/opt/retuner/defaults/retuner.ini
+        /tmp/cfg/viritin.ini > /rootfs/opt/viritin/defaults/viritin.ini
 
 FROM debian:bookworm-slim
 COPY --from=fetch /rootfs/ /
-COPY --from=build /build/retuner /opt/retuner/retuner
+COPY --from=build /build/viritin /opt/viritin/viritin
 COPY --chmod=755 mikrotik/entrypoint.sh /entrypoint.sh
 EXPOSE 80/tcp
 VOLUME /data

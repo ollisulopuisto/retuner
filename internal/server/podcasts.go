@@ -4,8 +4,8 @@ import (
 	"log"
 	"net/http"
 
-	"retuner/internal/podcasts"
-	"retuner/internal/vtuner"
+	"viritin/internal/podcasts"
+	"viritin/internal/vtuner"
 )
 
 func (s *Server) podOn() bool { return s.cfg.Bool("Podcasts", "Enable") }

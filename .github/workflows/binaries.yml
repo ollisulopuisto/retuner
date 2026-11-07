@@ -93,7 +93,7 @@ jobs:
           # The release tag when release.yml called this, else the version
           # written down in src/common.pas (the Go binary reports the same one;
           # internal/config has a test that keeps them equal). The updater asks
-          # for retuner-<tag without v>-<target>.tar.gz.
+          # for viritin-<tag without v>-<target>.tar.gz.
           tag="${{ inputs.release_tag }}"
           if [ -n "$tag" ]; then
             version="${tag#v}"
@@ -112,14 +112,14 @@ jobs:
           target=${out_arch}-${{ matrix.os }}
 
           echo "packaging $target"
-          stage="retuner-$version-$target"
+          stage="viritin-$version-$target"
           mkdir -p "$stage/config"
           if [ "${RUNNER_OS}" = Windows ]; then
-            cp "bin/$target/retuner.exe" "$stage/"
+            cp "bin/$target/viritin.exe" "$stage/"
           else
-            cp "bin/$target/retuner" "$stage/"
+            cp "bin/$target/viritin" "$stage/"
           fi
-          cp cfg/retuner.ini "$stage/"
+          cp cfg/viritin.ini "$stage/"
           cp cfg/avr.ini cfg/stations.ini cfg/podcasts.ini "$stage/config/"
           cp LICENSE.txt README.md "$stage/"
           tar -czf "$stage.tar.gz" "$stage"
@@ -167,5 +167,5 @@ jobs:
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" dist/*.tar.gz dist/SHA256SUMS --clobber
           else
-            gh release create "$tag" dist/*.tar.gz dist/SHA256SUMS --title "Retuner $tag" "$@"
+            gh release create "$tag" dist/*.tar.gz dist/SHA256SUMS --title "Viritin $tag" "$@"
           fi

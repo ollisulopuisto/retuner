@@ -205,7 +205,12 @@ cp "$WORK/repo/fi.ini.good" "$WORK/repo/fi.ini"
 # -i.bak rather than -i: BSD sed reads the argument after -i as the backup
 # suffix, so the bare form consumes the script and then tries to run the file
 # name as one. That is one of the reasons this suite has never passed on macOS.
-sed -i.bak 's|^PresetsCountries=fi$|PresetsCountries=../../etc,fi|' "$WORK/retuner.ini"
+if [ -f "$WORK/viritin.ini" ]; then
+  sed -i.bak 's|^PresetsCountries=fi$|PresetsCountries=../../etc,fi|' "$WORK/viritin.ini"
+fi
+if [ -f "$WORK/retuner.ini" ]; then
+  sed -i.bak 's|^PresetsCountries=fi$|PresetsCountries=../../etc,fi|' "$WORK/retuner.ini"
+fi
 start_server "$WORK/run4.log"
 has "the bad code is refused by name"        "$(cat "$WORK/run4.log")" "two-letter code"
 if [ -e "$WORK/config/presets/../../etc.ini" ] || [ -e "$WORK/etc.ini" ]; then

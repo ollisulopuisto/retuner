@@ -1,6 +1,6 @@
 // Package maintenance is the shutdown endpoint (src/maintenance.pas): a listener
 // that answers only the configured address and stops the service on
-// /retuner/down. Anything else gets 404, other clients get 503.
+// /viritin/down (or legacy /retuner/down). Anything else gets 404, other clients get 503.
 package maintenance
 
 import (
@@ -33,7 +33,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, body)
 		return
 	}
-	if strings.ToLower(r.URL.RequestURI()) == "/"+s.Root+"/down" {
+	uri := strings.ToLower(r.URL.RequestURI())
+	if uri == "/"+s.Root+"/down" || uri == "/viritin/down" || uri == "/retuner/down" || uri == "/ytuner/down" {
 		body := s.AppName + " service: Shutting down.....\n"
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Content-Length", strconv.Itoa(len(body)))

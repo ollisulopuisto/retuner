@@ -1,6 +1,6 @@
-# Working on Retuner
+# Working on Viritin
 
-Retuner is a fork of [YTuner](https://github.com/coffeegreg/YTuner) by Greg P.,
+Viritin is a fork of [YTuner](https://github.com/coffeegreg/YTuner) by Greg P.,
 MIT licensed, and nearly all of this code is his. Attribution is not decoration
 here: the banner, the README, `LICENSE.txt` and the program header all name him,
 and none of that gets swept up in a rename or tidied away.
@@ -27,7 +27,7 @@ are not:
 
 `INI_VERSION` is compared against `INIVersion=` in every user's config file.
 Bump it casually and every install is told its file is outdated. The add-on's
-`version:` in `retuner/config.yaml` tracks `APP_VERSION`.
+`version:` in `viritin/config.yaml` tracks `APP_VERSION`.
 
 **Lint everything, at the strictest setting available.** Shell scripts pass
 `shellcheck --severity=style`. Note that CI's shellcheck is older than a typical
@@ -95,11 +95,11 @@ bookmarks an AVR saved years ago and replays verbatim; `ytunerhost` is the
 placeholder inside those files. Both are still served and read for that reason.
 Anything persisted needs a migration, and the migration needs a test.
 
-**Naming: Retuner is the product, YTuner is only upstream.** Anything a user
-reads (log lines, warnings, UI, docs) says Retuner. YTuner stays where it is
+**Naming: Viritin is the product, YTuner is only upstream.** Anything a user
+reads (log lines, warnings, UI, docs) says Viritin. YTuner stays where it is
 attribution or history: the README and `LICENSE.txt` credit, the program header,
 `APP_COPYRIGHT`, `UPSTREAM_VERSION`, links to upstream issues. vTuner stays
-wherever it names the service Retuner replaces, including the `*.vtuner.com`
+wherever it names the service Viritin replaces, including the `*.vtuner.com`
 hostnames the DNS setup points at this machine. Compatibility strings (`/ytuner/`,
 `ytunerhost`, `ytuner.ini`) stay as above. The Lazarus project files keep their
 `ytuner.*` names. Last audit 2026-11-01: only the "outdated avr.ini" warning
@@ -124,13 +124,13 @@ so the service assumes it is reachable on port 80 at `act_as_host`. Changing
 it is.
 
 **The intercept list is written down in three places.** `INTERCEPT_DNS` in
-`src/dnsserver.pas`, `InterceptDNs=` in `cfg/retuner.ini`, and the dnsmasq block
+`src/dnsserver.pas`, `InterceptDNs=` in `cfg/viritin.ini`, and the dnsmasq block
 in `doc/APPLIANCE.md`. A domain added to one and not the others is a
 manufacturer that quietly stops working. `fuzz-test.sh` compares the last two
 and queries the first, so all three go red together.
 
 **A backgrounded subshell is not the process you killed.** `( cd "$WORK" &&
-./retuner > log 2>&1 ) &` sets `$!` to the subshell, not the server. Linux hides
+./viritin > log 2>&1 ) &` sets `$!` to the subshell, not the server. Linux hides
 it: its shells fold the last command of a subshell into an `exec` on their own,
 so the pid happens to be right. bash on macOS does not, and a CI run there ended
 with the runner terminating fourteen orphan retuners — each one able to hold a
@@ -163,4 +163,4 @@ interface and filters per connection instead.
 
 Fixes that are not fork-specific are worth offering back. Do not claim in the
 docs that they have been offered unless a pull request actually exists —
-`doc/RETUNER.md` said so once when it was not true.
+`doc/VIRITIN.md` said so once when it was not true.

@@ -169,9 +169,9 @@ INI
   # answered here, as a subdomain and as the apex, and a name nobody intercepts
   # must not be.
   echo "The intercept list does what it says"
-  patterns=$(sed -n 's/^InterceptDNs=//p' "$ROOT/cfg/retuner.ini" | head -1)
+  patterns=$(sed -n 's/^InterceptDNs=//p' "$ROOT/cfg/viritin.ini" "$ROOT/cfg/retuner.ini" 2>/dev/null | head -1)
   if [ -z "$patterns" ]; then
-    bad "no InterceptDNs line found in cfg/retuner.ini"
+    bad "no InterceptDNs line found in cfg/viritin.ini"
   elif python3 "$ROOT/script/testdata/dns-intercepts.py" "$2" 127.0.0.1 "$patterns"; then
     :
   else
@@ -186,7 +186,7 @@ INI
   if cmp -s "$run/doc-domains" "$run/ini-domains"; then
     ok "doc/APPLIANCE.md lists exactly the shipped intercept set"
   else
-    bad "doc/APPLIANCE.md and cfg/retuner.ini disagree about what to intercept"
+    bad "doc/APPLIANCE.md and cfg/viritin.ini disagree about what to intercept"
     diff "$run/ini-domains" "$run/doc-domains" | sed 's/^/       /' || true
   fi
 
@@ -404,13 +404,13 @@ INI
   done
   # Anything written outside config/ is the failure. The config directory is
   # allowed to fill up with junk; escaping it is not.
-  escaped=$(find "$run" -maxdepth 1 -name '*.ini' -not -name 'retuner.ini' 2>/dev/null | wc -l)
+  escaped=$(find "$run" -maxdepth 1 -name '*.ini' -not -name 'retuner.ini' -not -name 'viritin.ini' 2>/dev/null | wc -l)
   escaped=$((escaped + $(find /tmp -maxdepth 1 -name 'retuner-escaped.ini' 2>/dev/null | wc -l)))
   if [ "$escaped" -eq 0 ]; then
     ok "no config file was written outside the config directory"
   else
     bad "$escaped file(s) were written outside the config directory"
-    find "$run" -maxdepth 1 -name '*.ini' -not -name 'retuner.ini' | sed 's/^/       /'
+    find "$run" -maxdepth 1 -name '*.ini' -not -name 'retuner.ini' -not -name 'viritin.ini' | sed 's/^/       /'
     find /tmp -maxdepth 1 -name 'retuner-escaped.ini' | sed 's/^/       /'
     rm -f /tmp/retuner-escaped.ini
   fi

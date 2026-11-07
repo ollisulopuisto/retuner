@@ -151,7 +151,7 @@ begin
   if LContentType.IsEmpty then
     LContentType:=RELAY_DEFAULT_CONTENT_TYPE;
   LHead:='HTTP/1.0 200 OK'+#13#10
-        +'Server: '+RETUNER_USER_AGENT+'/'+APP_VERSION+#13#10
+        +'Server: '+VIRITIN_USER_AGENT+'/'+APP_VERSION+#13#10
         +'Content-Type: '+LContentType+#13#10;
 // Station name, genre and bitrate cost nothing to relay and some devices show
 // them, so pass on whatever the station supplied.
@@ -267,7 +267,7 @@ var
   LHead: string;
 begin
   LHead:='HTTP/1.0 '+AStatus+#13#10
-        +'Server: '+RETUNER_USER_AGENT+'/'+APP_VERSION+#13#10
+        +'Server: '+VIRITIN_USER_AGENT+'/'+APP_VERSION+#13#10
         +AExtraHeaders
         +'Connection: close'+#13#10#13#10;
   ASocket.WriteBuffer(LHead[1],Length(LHead));
@@ -313,7 +313,7 @@ begin
 // No IOTimeout: a live stream is meant to stay open indefinitely, and the read
 // only ends when the station stops or the AVR disconnects.
         LClient.IOTimeout:=0;
-        LClient.AddHeader(HTTP_HEADER_USER_AGENT,RETUNER_USER_AGENT+'/'+APP_VERSION);
+        LClient.AddHeader(HTTP_HEADER_USER_AGENT,VIRITIN_USER_AGENT+'/'+APP_VERSION);
         if LWantIcy then
           LClient.AddHeader('Icy-MetaData','1');
         try

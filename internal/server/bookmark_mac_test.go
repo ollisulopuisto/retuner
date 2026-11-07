@@ -6,15 +6,15 @@ import (
 	"path/filepath"
 	"testing"
 
-	"retuner/internal/bookmark"
-	"retuner/internal/config"
-	"retuner/internal/radiobrowser"
-	"retuner/internal/stations"
+	"viritin/internal/bookmark"
+	"viritin/internal/config"
+	"viritin/internal/radiobrowser"
+	"viritin/internal/stations"
 )
 
 func newTestServer(t *testing.T) *Server {
 	dir := t.TempDir()
-	cfgPath := filepath.Join(dir, "retuner.ini")
+	cfgPath := filepath.Join(dir, "viritin.ini")
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
 		t.Fatalf("config.Load failed: %v", err)
@@ -32,9 +32,9 @@ func TestBookmarkMACValidation(t *testing.T) {
 	s := newTestServer(t)
 	h := s.Handler()
 
-	// 1. bookmarkList endpoint: /retuner/bookmark
+	// 1. bookmarkList endpoint: /viritin/bookmark
 	// Valid MAC -> should not return 400 Bad Request
-	req := httptest.NewRequest("GET", "/retuner/bookmark?mac=001122334455", nil)
+	req := httptest.NewRequest("GET", "/viritin/bookmark?mac=001122334455", nil)
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, req)
 	if w.Code == http.StatusBadRequest {
@@ -42,11 +42,19 @@ func TestBookmarkMACValidation(t *testing.T) {
 	}
 
 	// Path traversal attempt in bookmarkList -> must return 400 Bad Request
-	req = httptest.NewRequest("GET", "/retuner/bookmark?mac=../../etc/passwd", nil)
+	req = httptest.NewRequest("GET", "/viritin/bookmark?mac=../../etc/passwd", nil)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, req)
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected invalid MAC with path traversal to be rejected with 400, got %d", w.Code)
+	}
+
+	// Legacy route /retuner/bookmark
+	req = httptest.NewRequest("GET", "/retuner/bookmark?mac=001122334455", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code == http.StatusBadRequest {
+		t.Errorf("expected valid MAC on legacy route to be accepted, got %d", w.Code)
 	}
 
 	// 2. station endpoint for bookmark ID (starts with MSB): /setupapp/stat/statxml.asp

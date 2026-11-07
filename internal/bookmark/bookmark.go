@@ -15,8 +15,9 @@ import (
 )
 
 const (
-	Host       = "retunerhost" // stands in for the server address inside a stored file
-	HostLegacy = "ytunerhost"
+	Host              = "viritinhost" // stands in for the server address inside a stored file
+	HostLegacyRetuner = "retunerhost"
+	HostLegacy        = "ytunerhost"
 )
 
 type Item struct {
@@ -162,10 +163,12 @@ func render(count int, items []Item) []byte {
 }
 
 var hostRe = regexp.MustCompile(`(?i)` + Host)
+var hostLegacyRetunerRe = regexp.MustCompile(`(?i)` + HostLegacyRetuner)
 var hostLegacyRe = regexp.MustCompile(`(?i)` + HostLegacy)
 
 func (s *Store) subst(v string) string {
 	v = hostRe.ReplaceAllLiteralString(v, s.URLHost)
+	v = hostLegacyRetunerRe.ReplaceAllLiteralString(v, s.URLHost)
 	return hostLegacyRe.ReplaceAllLiteralString(v, s.URLHost)
 }
 

@@ -4,6 +4,6 @@
 set -e
 ARCH=${1:-arm64}
 cd "$(dirname "$0")"
-docker buildx build --platform "linux/$ARCH" -f Dockerfile -t "retuner:$ARCH" --load ..
-docker save "retuner:$ARCH" -o "retuner-$ARCH.tar"
-ls -lh "retuner-$ARCH.tar"
+docker buildx build --platform "linux/$ARCH" -f Dockerfile -t "viritin:$ARCH" --load ..
+docker save "viritin:$ARCH" -o "viritin-$ARCH.tar"
+ls -lh "viritin-$ARCH.tar"

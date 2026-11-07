@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"retuner/internal/config"
+	"viritin/internal/config"
 )
 
 const (
-	DefaultURL = "https://raw.githubusercontent.com/ollisulopuisto/retuner/master/presets"
+	DefaultURL = "https://raw.githubusercontent.com/ollisulopuisto/viritin/master/presets"
 	maxBytes   = 512 * 1024
 )
 
@@ -93,7 +93,7 @@ func (p *Presets) fetch(code string) bool {
 		log.Printf("Presets: getting error %s (%v)", url, err)
 		return false
 	}
-	req.Header.Set("User-Agent", "Retuner/"+config.AppVersion)
+	req.Header.Set("User-Agent", "Viritin/"+config.AppVersion)
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Printf("Presets: getting error %s (%v)", url, err)

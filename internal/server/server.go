@@ -26,23 +26,24 @@ import (
 	"sync"
 	"time"
 
-	"retuner/internal/bookmark"
-	"retuner/internal/config"
-	"retuner/internal/dnsserver"
-	"retuner/internal/playlist"
-	"retuner/internal/podcasts"
-	"retuner/internal/radiobrowser"
-	"retuner/internal/relay"
-	"retuner/internal/stations"
-	"retuner/internal/translator"
-	"retuner/internal/vtuner"
+	"viritin/internal/bookmark"
+	"viritin/internal/config"
+	"viritin/internal/dnsserver"
+	"viritin/internal/playlist"
+	"viritin/internal/podcasts"
+	"viritin/internal/radiobrowser"
+	"viritin/internal/relay"
+	"viritin/internal/stations"
+	"viritin/internal/translator"
+	"viritin/internal/vtuner"
 )
 
 const (
-	pathRoot       = "retuner"
-	pathRootLegacy = "ytuner"
-	msgEmptyFolder = "This folder is intentionally empty..."
-	msgNoStations  = "No station(s) found"
+	pathRoot             = "viritin"
+	pathRootLegacy       = "retuner"
+	pathRootLegacyYTuner = "ytuner"
+	msgEmptyFolder       = "This folder is intentionally empty..."
+	msgNoStations        = "No station(s) found"
 )
 
 type Server struct {
@@ -75,7 +76,7 @@ func New(cfg *config.Config, avr *config.AVR, urlHost string, store *stations.St
 	if size <= 0 {
 		size = 200
 	}
-	s := &Server{resolver: &playlist.Resolver{UserAgent: "Retuner/" + config.AppVersion}, cfg: cfg, avr: avr, urlHost: urlHost, token: cfg.Str("Configuration", "MyToken"), iconSize: size,
+	s := &Server{resolver: &playlist.Resolver{UserAgent: "Viritin/" + config.AppVersion}, cfg: cfg, avr: avr, urlHost: urlHost, token: cfg.Str("Configuration", "MyToken"), iconSize: size,
 		placehold: true, bookmarks: cfg.Bool("Bookmark", "Enable"), bm: bm, dns: dns, rb: rb, avrs: map[string]*config.AVR{}, commonAVR: cfg.Int("Configuration", "CommonAVRini", 1) != 0, localCtry: strings.TrimSpace(cfg.Str("Configuration", "LocalCountry")), store: store, mystOn: cfg.Bool("MyStations", "Enable"),
 		httpClient: &http.Client{
 			Timeout: 15 * time.Second,
@@ -90,7 +91,7 @@ func New(cfg *config.Config, avr *config.AVR, urlHost string, store *stations.St
 				IdleConnTimeout:       90 * time.Second,
 			},
 		}}
-	s.pod = &podcasts.Store{File: filepath.Join(cfg.ConfigDir(), cfg.Str("Podcasts", "PodcastsFile")), UserAgent: "Retuner/" + config.AppVersion,
+	s.pod = &podcasts.Store{File: filepath.Join(cfg.ConfigDir(), cfg.Str("Podcasts", "PodcastsFile")), UserAgent: "Viritin/" + config.AppVersion,
 		Limit: cfg.Int("Podcasts", "PodcastEpisodesLimit", 100), TTL: time.Duration(cfg.Int("Podcasts", "PodcastCacheTTL", 60)) * time.Minute}
 	if s.pod.Limit < 1 {
 		s.pod.Limit = 100
@@ -108,7 +109,7 @@ func New(cfg *config.Config, avr *config.AVR, urlHost string, store *stations.St
 }
 
 func (s *Server) respond(w http.ResponseWriter, code int, ctype string, body []byte) {
-	w.Header().Set("Server", "Retuner/"+config.AppVersion)
+	w.Header().Set("Server", "Viritin/"+config.AppVersion)
 	w.Header().Set("Content-Type", ctype)
 	// Pascal answers with a Content-Length, never chunked; some receivers need that.
 	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
@@ -153,7 +154,7 @@ func (s *Server) Handler() http.Handler {
 		case lp == "/setupapp/favxml.asp":
 			s.favorite(w, r)
 		default:
-			for _, root := range []string{pathRoot, pathRootLegacy} {
+			for _, root := range []string{pathRoot, pathRootLegacy, pathRootLegacyYTuner} {
 				switch lp {
 				case "/" + root + "/about":
 					s.about(w, r)
@@ -397,7 +398,7 @@ func (s *Server) fetchLogo(u string) ([]byte, bool) {
 		return nil, false
 	}
 	req.Header.Set("Accept", "image/jpeg,image/png,image/gif")
-	req.Header.Set("User-Agent", "Retuner/"+config.AppVersion)
+	req.Header.Set("User-Agent", "Viritin/"+config.AppVersion)
 	cl := s.httpClient
 	if cl == nil {
 		cl = &http.Client{Timeout: 15 * time.Second}

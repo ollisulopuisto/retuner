@@ -1,4 +1,4 @@
-// Retuner (Go port, in progress). See doc/GO-PORT.md for stage and parity status.
+// Viritin (Go port, in progress). See doc/GO-PORT.md for stage and parity status.
 package main
 
 import (
@@ -11,18 +11,18 @@ import (
 	"strconv"
 	"time"
 
-	"retuner/internal/avrremote"
-	"retuner/internal/bookmark"
-	"retuner/internal/config"
-	"retuner/internal/dnsserver"
-	"retuner/internal/maintenance"
-	"retuner/internal/playlist"
-	"retuner/internal/presets"
-	"retuner/internal/radiobrowser"
-	"retuner/internal/relay"
-	"retuner/internal/server"
-	"retuner/internal/stations"
-	"retuner/internal/webgui"
+	"viritin/internal/avrremote"
+	"viritin/internal/bookmark"
+	"viritin/internal/config"
+	"viritin/internal/dnsserver"
+	"viritin/internal/maintenance"
+	"viritin/internal/playlist"
+	"viritin/internal/presets"
+	"viritin/internal/radiobrowser"
+	"viritin/internal/relay"
+	"viritin/internal/server"
+	"viritin/internal/stations"
+	"viritin/internal/webgui"
 )
 
 func localIP(v string) string {
@@ -40,12 +40,22 @@ func localIP(v string) string {
 
 func main() {
 	// Like the Pascal build: no command line options (anything given is ignored),
-	// retuner.ini lives beside the executable.
-	iniPath := "retuner.ini"
+	// viritin.ini lives beside the executable (with automatic fallback to retuner.ini or ytuner.ini).
+	dir := "."
 	if exe, err := os.Executable(); err == nil {
-		iniPath = filepath.Join(filepath.Dir(exe), "retuner.ini")
+		dir = filepath.Dir(exe)
 	}
-	log.Printf("Retuner (Go port) - %s", config.AppCopyright)
+	iniPath := filepath.Join(dir, "viritin.ini")
+	if _, err := os.Stat(iniPath); os.IsNotExist(err) {
+		oldRetuner := filepath.Join(dir, "retuner.ini")
+		oldYtuner := filepath.Join(dir, "ytuner.ini")
+		if _, err := os.Stat(oldRetuner); err == nil {
+			iniPath = oldRetuner
+		} else if _, err := os.Stat(oldYtuner); err == nil {
+			iniPath = oldYtuner
+		}
+	}
+	log.Printf("Viritin (Go port) - %s", config.AppCopyright)
 
 	cfg, err := config.Load(iniPath)
 	if err != nil {
@@ -64,7 +74,7 @@ func main() {
 	var rb *radiobrowser.Client
 	if cfg.Int("RadioBrowser", "Enable", 1) != 0 {
 		ct := cfg.Str("RadioBrowser", "RBCacheType")
-		rb = radiobrowser.New(cfg.Str("RadioBrowser", "RBAPIURL"), "Retuner/"+config.AppVersion,
+		rb = radiobrowser.New(cfg.Str("RadioBrowser", "RBAPIURL"), "Viritin/"+config.AppVersion,
 			cfg.Int("RadioBrowser", "RBPopularAndSearchStationsLimit", 100), cfg.Int("RadioBrowser", "RBMinStationsPerCategory", 3), ct, cfg.Int("RadioBrowser", "RBCacheTTL", 0))
 		rb.CacheDir = cfg.CacheDir()
 		if ct == "catFile" {
@@ -190,7 +200,7 @@ func main() {
 	addr := net.JoinHostPort(bind, strconv.Itoa(wp))
 	log.Printf("Web Service: listening on: %s", addr)
 	if cfg.Bool("MaintenanceServer", "Enable") {
-		m := &maintenance.Server{Address: cfg.Str("MaintenanceServer", "MaintenanceServerIPAddress"), Root: "retuner", AppName: config.AppName,
+		m := &maintenance.Server{Address: cfg.Str("MaintenanceServer", "MaintenanceServerIPAddress"), Root: "viritin", AppName: config.AppName,
 			Shutdown: func() {
 				log.Printf("%s: Shutting down. Please wait..", config.AppName)
 				log.Printf("%s: Maintenance Service: Shutting down", config.AppName)
@@ -207,7 +217,7 @@ func main() {
 	srv := server.New(cfg, avr, urlHost, store, bm, dnsSrv, rb)
 	if cfg.Bool("Configuration", "RelayHTTPS") {
 		rl := &relay.Server{Resolve: srv.RelayResolve, Playlists: cfg.Bool("Configuration", "ResolvePlaylists"),
-			Resolver: &playlist.Resolver{UserAgent: "Retuner/" + config.AppVersion}, UserAgent: "Retuner/" + config.AppVersion}
+			Resolver: &playlist.Resolver{UserAgent: "Viritin/" + config.AppVersion}, UserAgent: "Viritin/" + config.AppVersion}
 		if err := rl.Start(cfg.Str("WebServer", "WebServerIPAddress"), cfg.Int("Configuration", "RelayPort", 8888)); err != nil {
 			log.Printf("Relay Service: error (%v)", err)
 		}

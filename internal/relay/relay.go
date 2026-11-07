@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"retuner/internal/playlist"
+	"viritin/internal/playlist"
 )
 
 const (
@@ -39,7 +39,7 @@ type Server struct {
 	Resolve   func(id string) string // station id -> stream URL, "" when unknown
 	Playlists bool                   // ResolvePlaylists
 	Resolver  *playlist.Resolver
-	UserAgent string // Retuner/<version>
+	UserAgent string // Viritin/<version>
 	Pause     time.Duration
 	// Transport overrides the upstream transport (tests only). Nil: the default
 	// one, which verifies TLS certificates against the system roots.

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"retuner/internal/config"
+	"viritin/internal/config"
 )
 
 // safeCacheMAC ensures receiver identifiers cannot cause path traversal in CacheDir.

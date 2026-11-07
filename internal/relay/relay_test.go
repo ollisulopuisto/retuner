@@ -59,14 +59,14 @@ func TestHTTPSUpstream(t *testing.T) {
 	defer up.Close()
 	resolve := func(string) string { return up.URL }
 
-	good := &Server{Resolve: resolve, UserAgent: "Retuner/test", Pause: time.Millisecond, Transport: up.Client().Transport}
+	good := &Server{Resolve: resolve, UserAgent: "Viritin/test", Pause: time.Millisecond, Transport: up.Client().Transport}
 	out := relayOnce(t, good)
 	if !strings.HasPrefix(out, "HTTP/1.0 200 OK") || !strings.Contains(out, "Content-Type: audio/mpeg") || !strings.HasSuffix(out, "AUDIOBYTES") {
 		t.Fatalf("trusted https upstream: %q", out)
 	}
 
 	hits.Store(-100) // the untrusted server must never be reached successfully
-	bad := &Server{Resolve: resolve, UserAgent: "Retuner/test", Pause: time.Millisecond}
+	bad := &Server{Resolve: resolve, UserAgent: "Viritin/test", Pause: time.Millisecond}
 	out = relayOnce(t, bad)
 	if !strings.Contains(out, "502") || strings.Contains(out, "AUDIOBYTES") {
 		t.Fatalf("untrusted certificate must give 502 and no audio: %q", out)
@@ -84,7 +84,7 @@ func TestBadStreamsWontKillServer(t *testing.T) {
 
 	s := &Server{
 		Resolve:   func(string) string { return srv500.URL },
-		UserAgent: "Retuner/test",
+		UserAgent: "Viritin/test",
 		Pause:     time.Millisecond,
 		Transport: srv500.Client().Transport,
 	}
@@ -103,7 +103,7 @@ func TestBadStreamsWontKillServer(t *testing.T) {
 
 	sBadIcy := &Server{
 		Resolve:   func(string) string { return srvBadIcy.URL },
-		UserAgent: "Retuner/test",
+		UserAgent: "Viritin/test",
 		Pause:     time.Millisecond,
 		Transport: srvBadIcy.Client().Transport,
 	}
@@ -125,7 +125,7 @@ func TestBadStreamsWontKillServer(t *testing.T) {
 		Resolve: func(string) string {
 			panic("simulated resolve panic")
 		},
-		UserAgent: "Retuner/test",
+		UserAgent: "Viritin/test",
 	}
 	c1, c2 = net.Pipe()
 	go sPanic.serve(c2)

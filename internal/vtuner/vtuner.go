@@ -9,10 +9,13 @@ import (
 	"strings"
 )
 
-const PathParamDummy = "?retuner=true"
+const PathParamDummy = "?viritin=true"
 
-// AddRetunerParameter mirrors AddRetunerParameter in vtuner.pas.
-func AddRetunerParameter(u string) string { return u + PathParamDummy }
+// AddViritinParameter mirrors AddViritinParameter in vtuner.pas.
+func AddViritinParameter(u string) string { return u + PathParamDummy }
+
+// AddRetunerParameter is kept as an alias for compatibility.
+func AddRetunerParameter(u string) string { return AddViritinParameter(u) }
 
 type Item interface{ write(*bytes.Buffer) }
 

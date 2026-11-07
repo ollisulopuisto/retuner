@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"retuner/internal/config"
+	"viritin/internal/config"
 )
 
 func TestWildAndLists(t *testing.T) {
