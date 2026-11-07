@@ -294,16 +294,56 @@ type Translator struct {
 const filterStrip = "!\"'():@&=+$,/?%#[]-.~\n\r\t"
 
 // StripChars mirrors common.pas StripChars for a set of single-byte characters.
+// Bolt optimization: Table lookup for single-byte set, zero-allocation fast-path
+// when no stripped chars or spaces exist, and single-pass stream into pre-grown builder
+// collapsing runs of spaces/stripped characters into single spaces.
 func StripChars(in, chars string) string {
-	var b strings.Builder
+	if len(in) == 0 {
+		return ""
+	}
+	var set [256]bool
+	for i := 0; i < len(chars); i++ {
+		set[chars[i]] = true
+	}
+	hasMatch := false
 	for i := 0; i < len(in); i++ {
-		if strings.IndexByte(chars, in[i]) >= 0 {
-			b.WriteByte(' ')
-		} else {
-			b.WriteByte(in[i])
+		c := in[i]
+		if c == ' ' || set[c] {
+			hasMatch = true
+			break
 		}
 	}
-	return strings.Join(strings.FieldsFunc(strings.TrimSpace(b.String()), func(r rune) bool { return r == ' ' }), " ")
+	if !hasMatch {
+		return in
+	}
+	set[' '] = true
+	start := 0
+	for start < len(in) && set[in[start]] {
+		start++
+	}
+	if start == len(in) {
+		return ""
+	}
+	end := len(in) - 1
+	for end >= start && set[in[end]] {
+		end--
+	}
+	var b strings.Builder
+	b.Grow(end - start + 1)
+	inSpace := false
+	for i := start; i <= end; i++ {
+		c := in[i]
+		if set[c] {
+			if !inSpace {
+				b.WriteByte(' ')
+				inSpace = true
+			}
+		} else {
+			b.WriteByte(c)
+			inSpace = false
+		}
+	}
+	return b.String()
 }
 
 func filterList(raw string) []string {
