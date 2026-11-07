@@ -23,6 +23,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 # A push supersedes the run before it. A called run carries its tag in the
 # group, so a release is never superseded by the next push.
 concurrency:
@@ -91,14 +94,13 @@ jobs:
         shell: bash
         run: |
           # The release tag when release.yml called this, else the version
-          # written down in src/common.pas (the Go binary reports the same one;
-          # internal/config has a test that keeps them equal). The updater asks
-          # for viritin-<tag without v>-<target>.tar.gz.
+          # written down in internal/config/config.go (the updater asks
+          # for viritin-<tag without v>-<target>.tar.gz).
           tag="${{ inputs.release_tag }}"
           if [ -n "$tag" ]; then
             version="${tag#v}"
           else
-            version=$(sed -n "s/^ *APP_VERSION *= *'\([0-9.]*\)'.*/\1/p" src/common.pas)
+            version=$(sed -n 's/.*AppVersion *= *"\([0-9.]*\)".*/\1/p' internal/config/config.go)
           fi
           [ -n "$version" ] || { echo "no version"; exit 1; }
 

@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/).
 
+## [26.11.07.398] - 2026-11-07
+
+### Removed
+- Decommissioned and removed legacy Free Pascal source code (`src/*.pas`, `ytuner.lpi`, `res/sql.rc`).
+- Removed Free Pascal build dependencies and Indy toolchains from `mikrotik/Dockerfile` in favor of native multi-platform Go build.
+
+### Changed
+- Updated CI/CD release and binary packaging workflows to read versions directly from `internal/config/config.go` and `viritin/config.yaml`.
+- Enforced `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true` in GitHub Actions workflows.
+- Archived differential parity test suites against legacy Pascal binary.
+
 ## [26.11.07.396] - 2026-11-07
 
 ### Changed

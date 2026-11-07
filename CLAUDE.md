@@ -5,8 +5,8 @@ MIT licensed, and nearly all of this code is his. Attribution is not decoration
 here: the banner, the README, `LICENSE.txt` and the program header all name him,
 and none of that gets swept up in a rename or tidied away.
 
-Free Pascal 3.2.2 — what Debian, Ubuntu and Raspberry Pi OS actually ship, not
-trunk. If something needs a newer compiler it does not go in.
+Viritin is built in Go (Go 1.24+). The legacy Free Pascal codebase was
+decommissioned in v26.11.07.398.
 
 ## House rules
 

@@ -19,6 +19,9 @@ concurrency:
   group: pr-tests-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   test:
     # The suites take about two minutes. The default limit is six hours, which

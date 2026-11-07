@@ -5,6 +5,11 @@
 # keys in place; so is the Go fill) and the warning lines it logs
 # (timestamps stripped).
 #   ./script/iniversion-parity.sh <reference-binary> <go-binary>
+# [HISTORICAL] This test verified byte parity against the legacy Free Pascal reference binary.
+# The Pascal implementation was decommissioned; this script is preserved for historical reference.
+echo "Skipping: Parity test archived (Pascal reference decommissioned)." >&2
+exit 0
+
 set -eu
 REF=${1:?reference}; NEW=${2:?go binary}
 HERE=$(cd "$(dirname "$0")" && pwd)

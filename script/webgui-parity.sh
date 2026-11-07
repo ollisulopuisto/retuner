@@ -3,6 +3,11 @@
 # reference binary and to the Go port; status and body must match (status
 # route compared with the version line masked).
 #   ./script/webgui-parity.sh <reference-binary> <go-binary>
+# [HISTORICAL] This test verified byte parity against the legacy Free Pascal reference binary.
+# The Pascal implementation was decommissioned; this script is preserved for historical reference.
+echo "Skipping: Parity test archived (Pascal reference decommissioned)." >&2
+exit 0
+
 set -eu
 REF=${1:?reference}; NEW=${2:?go binary}
 W=$(mktemp -d); PIDS=""
